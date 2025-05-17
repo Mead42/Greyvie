@@ -19,7 +19,9 @@ services:
   dynamodb-local:
     image: amazon/dynamodb-local:latest
     container_name: local-dynamodb
-    command: -jar DynamoDBLocal.jar -inMemory -sharedDb
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
+    volumes:
+      - ./data/dynamodb:/home/dynamodblocal/data
     ports:
       - '8000:8000'
 

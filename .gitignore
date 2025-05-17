@@ -1,4 +1,88 @@
-/.env
-/.env.dev
-/.env.example
+# Virtual Environment
+venv/
+env/
+.venv/
+.env/
+ENV/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
 .aider*
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Database
+*.db
+*.sqlite3
+/projects/infra/data/*
+
+# AI-powered editors and assistants
+.cursor/
+.roo/
+.aider/
+.github/copilot/
+
+# Other AI/ML tool directories
+.continue/
+.codeium/
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Added by Claude Task Master
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dev-debug.log
+
+# Dependency directories
+node_modules/
+
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+*~
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Task files
+tasks.json
+tasks/ 
