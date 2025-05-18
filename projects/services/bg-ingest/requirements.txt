@@ -2,6 +2,7 @@
 fastapi>=0.95.0
 uvicorn>=0.21.1
 pydantic>=1.10.7
+pydantic-settings>=2.0.0  # For pydantic v2 compatibility
 python-dotenv>=1.0.0
 
 # AWS

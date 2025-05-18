@@ -38,15 +38,15 @@ jobs:
         
     - name: Lint with flake8
       run: |
-        poetry run flake8 bg_ingest tests
+        poetry run flake8 src tests
         
     - name: Type check with mypy
       run: |
-        poetry run mypy bg_ingest tests
+        poetry run mypy src tests
         
     - name: Format check with black
       run: |
-        poetry run black --check bg_ingest tests
+        poetry run black --check src tests
         
     - name: Test with pytest
       run: |
