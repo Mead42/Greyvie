@@ -74,9 +74,9 @@ class Settings(BaseSettings):
 
     # DynamoDB Configuration
     dynamodb_endpoint: Optional[str] = Field(None, description="DynamoDB endpoint URL, primarily for local development")
-    dynamodb_table: str = Field(..., description="DynamoDB table for BG readings")
-    dynamodb_user_tokens_table: str = Field(..., description="DynamoDB table for user tokens")
-    dynamodb_sync_jobs_table: str = Field(..., description="DynamoDB table for sync jobs")
+    dynamodb_table: str = Field("bg_readings", description="DynamoDB table for BG readings")
+    dynamodb_user_tokens_table: str = Field("user_tokens", description="DynamoDB table for user tokens")
+    dynamodb_sync_jobs_table: str = Field("sync_jobs", description="DynamoDB table for sync jobs")
 
     # RabbitMQ Configuration
     rabbitmq_url: Optional[str] = Field(None, description="RabbitMQ connection URL")
@@ -121,8 +121,7 @@ class Settings(BaseSettings):
         return validated
     
     # Required fields validation
-    @field_validator("aws_region", "dynamodb_table", "dynamodb_user_tokens_table", 
-                   "dynamodb_sync_jobs_table", "dexcom_redirect_uri")
+    @field_validator("aws_region", "dexcom_redirect_uri")
     @classmethod
     def check_required_fields(cls, v: Union[str, None], info: Any) -> str:
         """
@@ -181,6 +180,8 @@ class Settings(BaseSettings):
                 self.dynamodb_endpoint = "http://localhost:8000"
             if not self.rabbitmq_url:
                 self.rabbitmq_url = "amqp://guest:guest@localhost:5672/"
+            if not self.dexcom_redirect_uri:
+                self.dexcom_redirect_uri = "http://localhost:5001/api/oauth/callback"
 
 
 @lru_cache()
