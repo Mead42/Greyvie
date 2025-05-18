@@ -1,0 +1,57 @@
+[tool.poetry]
+name = "bg-ingest"
+version = "0.1.0"
+description = "Blood Glucose Ingest Service for GreyVie"
+authors = ["GreyVie Team"]
+readme = "README.md"
+packages = [{include = "bg_ingest"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.109.0"
+uvicorn = "^0.25.0"
+pydantic = {extras = ["email"], version = "^2.5.3"}
+python-dotenv = "^1.0.0"
+boto3 = "^1.34.11"
+httpx = "^0.25.2"
+pika = "^1.3.2"
+python-jose = "^3.3.0"
+passlib = "^1.7.4"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pytest-asyncio = "^0.23.2"
+pytest-cov = "^4.1.0"
+pytest-mock = "^3.12.0"
+black = "^23.12.0"
+flake8 = "^6.1.0"
+isort = "^5.13.2"
+mypy = "^1.7.1"
+moto = "^4.2.9"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+markers = [
+    "integration: marks tests as integration tests (need infrastructure)",
+] 
