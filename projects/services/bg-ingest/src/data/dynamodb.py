@@ -86,10 +86,6 @@ class DynamoDBClient:
                 ProvisionedThroughput={
                     "ReadCapacityUnits": 5,
                     "WriteCapacityUnits": 5
-                },
-                TimeToLiveSpecification={
-                    "AttributeName": "ttl",
-                    "Enabled": True
                 }
             )
             

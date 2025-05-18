@@ -111,6 +111,10 @@ class Settings(BaseSettings):
         """
         if len(v) == 1 and v[0] == "*":
             return v
+            
+        # If we have a single comma-separated string, split it
+        if len(v) == 1 and "," in v[0]:
+            v = v[0].split(",")
 
         # Make sure all origins have a scheme
         validated = []
@@ -153,8 +157,13 @@ class Settings(BaseSettings):
             
             # Apply secrets to our configuration
             for key, value in secrets.items():
-                if hasattr(self, key.lower()):
-                    setattr(self, key.lower(), value)
+                key_lower = key.lower()
+                if hasattr(self, key_lower):
+                    # Check if the field is a SecretStr type and wrap the value
+                    field_info = self.__class__.model_fields.get(key_lower)
+                    if field_info and field_info.annotation == SecretStr and isinstance(value, str):
+                        value = SecretStr(value)
+                    setattr(self, key_lower, value)
         except Exception as e:
             if self.service_env == "development":
                 print(f"Warning: Failed to load secrets: {str(e)}")
