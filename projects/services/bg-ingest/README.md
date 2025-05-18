@@ -53,6 +53,62 @@ The **BG Ingest** microservice connects to Continuous Glucose Monitoring (CGM) p
    | DEXCOM_API_BASE_URL      | Dexcom API Base URL (sandbox or production)         |
    | POLL_INTERVAL_SECONDS    | How often to poll for new readings (default: 900)   |
 
+## 🛠️ Configuration System
+
+The service uses a comprehensive configuration system built with Pydantic:
+
+### Key Features
+
+- **Environment-based configuration** with `.env` file support
+- **Type validation** for all settings
+- **Secure secret handling** via AWS Secrets Manager integration
+- **Fallback mechanisms** for development environments
+- **Configuration singleton** for app-wide access
+
+### Usage
+
+```python
+from src.utils.config import get_settings
+
+# Get the cached settings instance
+settings = get_settings()
+
+# Use configuration values
+dynamodb_client = boto3.client(
+    'dynamodb',
+    region_name=settings.aws_region,
+    endpoint_url=settings.dynamodb_endpoint
+)
+```
+
+### Environment Modes
+
+- **Development**: Local services with sensible defaults
+  - Auto-fallbacks for local DynamoDB and RabbitMQ
+  - Tolerant of missing secrets
+- **Staging/Production**: Strict validation
+  - AWS Secrets Manager integration
+  - Required credentials validation
+
+### Secret Management
+
+For production, sensitive values should be stored in AWS Secrets Manager:
+
+1. Create a secret with your sensitive values:
+   ```json
+   {
+     "DEXCOM_CLIENT_ID": "your-production-client-id",
+     "DEXCOM_CLIENT_SECRET": "your-production-client-secret"
+   }
+   ```
+
+2. Set the `SECRET_NAME` in your environment:
+   ```
+   SECRET_NAME=bg-ingest/secrets
+   ```
+
+The configuration system will automatically fetch and apply these values at startup.
+
 ---
 
 ## 🏃‍♂️ Development
@@ -90,7 +146,7 @@ The **BG Ingest** microservice connects to Continuous Glucose Monitoring (CGM) p
      diabetesai/bg-ingest
    ```
 
-3. **Compose**: Included in monorepo’s `infra/docker-compose.yml`:
+3. **Compose**: Included in monorepo's `infra/docker-compose.yml`:
    ```yaml
    bg-ingest:
      build:
