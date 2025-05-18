@@ -110,8 +110,8 @@ class SyncJob(BaseModel):
         item["status"] = item["status"].value
         item["sync_type"] = item["sync_type"].value
         
-        # Handle nested objects
-        item["stats"] = item["stats"].model_dump()
+        # Handle stats object - convert directly from self.stats to avoid dict issues
+        item["stats"] = self.stats.model_dump()
         
         return item
     
