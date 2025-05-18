@@ -43,4 +43,4 @@ USER app
 
 # Run the application
 EXPOSE 5001
-CMD ["uvicorn", "bg_ingest.main:app", "--host", "0.0.0.0", "--port", "5001"] 
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "5001"] 

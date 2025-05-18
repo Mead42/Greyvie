@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from starlette.middleware.cors import CORSMiddleware
 
-from bg_ingest.utils.config import Settings, get_settings
+from src.utils.config import Settings, get_settings
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     import uvicorn
     
     uvicorn.run(
-        "bg_ingest.main:app",
+        "src.main:app",
         host="0.0.0.0",
         port=5001,
         reload=True,

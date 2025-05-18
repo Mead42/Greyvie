@@ -74,19 +74,31 @@ services:
   #     - minio
   #     - rabbitmq
 
-  # bg-ingest:
-  #   build:
-  #     context: ../services/bg-ingest
-  #     dockerfile: Dockerfile
-  #   container_name: bg-ingest
-  #   ports:
-  #     - '5001:5001'
-  #   env_file:
-  #     - ../.env.dev   # Dexcom sandbox credentials, dev overrides
-  #   environment:
-  #     DYNAMODB_ENDPOINT: http://dynamodb-local:8000
-  #   depends_on:
-  #     - dynamodb-local
+  bg-ingest:
+    build:
+      context: ../services/bg-ingest
+      dockerfile: Dockerfile
+    container_name: bg-ingest
+    ports:
+      - '5001:5001'
+    volumes:
+      - ../services/bg-ingest:/app
+    env_file:
+      - ../services/bg-ingest/.env
+    environment:
+      - DYNAMODB_ENDPOINT=http://dynamodb-local:8000
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - SERVICE_ENV=development
+      - LOG_LEVEL=DEBUG
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=local
+      - AWS_SECRET_ACCESS_KEY=local
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 5001
+    depends_on:
+      - dynamodb-local
+      - rabbitmq
+    networks:
+      - default
 
   # food-recognize:
   #   build:
