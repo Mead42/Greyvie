@@ -2,12 +2,15 @@
 
 import logging
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, Dict
 
 from fastapi import FastAPI, HTTPException
 from starlette.middleware.cors import CORSMiddleware
 
 from src.utils.config import Settings, get_settings
+from src.data.dynamodb import get_dynamodb_client
+from src.api.middleware import RateLimiter, CacheControl
+from src.api.readings import router as readings_router
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -28,8 +31,16 @@ async def lifespan(app: FastAPI) -> Any:
     logger.info("Starting BG Ingest Service...")
     
     # Initialize connections to AWS services
+    db_client = get_dynamodb_client()
+    # Create tables if they don't exist (in development mode)
+    if settings.service_env == "development":
+        try:
+            db_client.create_all_tables(wait=True)
+            logger.info("DynamoDB tables created/verified")
+        except Exception as e:
+            logger.error(f"Error creating DynamoDB tables: {e}")
     
-    # Initialize connection to RabbitMQ
+    # Initialize connection to RabbitMQ (if applicable)
     
     yield
     
@@ -51,7 +62,8 @@ def create_app() -> FastAPI:
         lifespan=lifespan
     )
     
-    # CORS
+    # Add middlewares
+    # CORS middleware
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -60,11 +72,23 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     
-    # Add routers here
-    # app.include_router(api_router, prefix="/api")
+    # Rate limiting middleware
+    app.add_middleware(
+        RateLimiter,
+        rate_limit_per_minute=120,  # 2 requests per second
+        rate_limit_burst=20,         # Allow burst of 20 requests
+        include_paths=["/api/"],
+        exclude_paths=["/health", "/metrics"]
+    )
+    
+    # Cache control middleware
+    app.add_middleware(CacheControl)
+    
+    # Add routers
+    app.include_router(readings_router, prefix="/api/bg", tags=["glucose"])
     
     @app.get("/health")
-    async def health_check() -> dict[str, str]:
+    async def health_check() -> Dict[str, str]:
         """
         Health check endpoint.
         
@@ -73,51 +97,24 @@ def create_app() -> FastAPI:
         """
         return {"status": "healthy", "service": "bg-ingest"}
     
-    @app.get("/api/bg/{user_id}/latest")
-    async def get_latest_reading(user_id: str) -> dict[str, str]:
+    @app.get("/metrics")
+    async def metrics() -> Dict[str, Any]:
         """
-        Get latest BG reading for a user.
+        Service metrics endpoint.
         
-        Args:
-            user_id: The user ID
-            
         Returns:
-            dict: Latest reading data
+            dict: Service metrics
         """
-        # TODO: Implement fetching latest reading from DynamoDB
-        return {"message": "Not implemented yet"}
-    
-    @app.get("/api/bg/{user_id}")
-    async def get_readings(
-        user_id: str, from_date: str = None, to_date: str = None
-    ) -> dict[str, str]:
-        """
-        Get BG readings for a user with optional date filtering.
-        
-        Args:
-            user_id: The user ID
-            from_date: Optional start date filter
-            to_date: Optional end date filter
-            
-        Returns:
-            dict: Readings data
-        """
-        # TODO: Implement fetching readings with date range
-        return {"message": "Not implemented yet"}
-    
-    @app.post("/api/bg/{user_id}/webhook")
-    async def dexcom_webhook(user_id: str) -> dict[str, str]:
-        """
-        Handle webhook notifications from Dexcom.
-        
-        Args:
-            user_id: The user ID
-            
-        Returns:
-            dict: Webhook processing result
-        """
-        # TODO: Implement webhook handler for Dexcom notifications
-        return {"message": "Webhook received"}
+        # In a real implementation, collect metrics from various sources
+        return {
+            "status": "success",
+            "data": {
+                "active_users": 0,
+                "readings_last_24h": 0,
+                "avg_latency_ms": 0,
+                "errors_last_24h": 0
+            }
+        }
     
     return app
 

@@ -3,6 +3,7 @@
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union, Any
+from functools import lru_cache
 
 import boto3
 from boto3.dynamodb.conditions import Key, Attr
@@ -289,18 +290,12 @@ class GlucoseReadingRepository:
             raise
 
 
-# Singleton instance
-_glucose_repository: Optional[GlucoseReadingRepository] = None
-
-
+@lru_cache()
 def get_glucose_repository() -> GlucoseReadingRepository:
     """
-    Get a singleton instance of the glucose reading repository.
+    Create and cache a glucose reading repository instance.
     
     Returns:
-        GlucoseReadingRepository: The glucose reading repository
+        GlucoseReadingRepository: Repository for glucose readings
     """
-    global _glucose_repository
-    if _glucose_repository is None:
-        _glucose_repository = GlucoseReadingRepository()
-    return _glucose_repository 
+    return GlucoseReadingRepository() 
