@@ -44,7 +44,9 @@ class UserToken(BaseModel):
     
     def is_expired(self) -> bool:
         """Check if the token has expired."""
-        return datetime.utcnow() >= self.expires_at
+        # Add a 30-second buffer to account for latency and clock differences
+        buffer_time = timedelta(seconds=30)
+        return datetime.utcnow() >= (self.expires_at - buffer_time)
     
     def expires_soon(self, threshold_minutes: int = 10) -> bool:
         """Check if the token will expire soon."""
