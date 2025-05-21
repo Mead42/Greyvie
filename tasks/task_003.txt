@@ -1,0 +1,85 @@
+# Task ID: 3
+# Title: Set Up DynamoDB Tables and Data Models
+# Status: completed
+# Dependencies: 2
+# Priority: high
+# Description: Design and implement DynamoDB tables and corresponding data models for storing blood glucose readings, user tokens, and synchronization jobs.
+# Details:
+1. Create DynamoDB table definitions for:
+   - bg_readings: Store glucose readings with user_id (partition key) and timestamp (sort key)
+   - user_tokens: Store OAuth tokens with user_id as primary key
+   - sync_jobs: Track synchronization jobs with job_id as primary key
+
+2. Implement Pydantic models for data validation:
+   ```python
+   from pydantic import BaseModel, Field
+   from datetime import datetime
+   from typing import Dict, Optional, Literal
+   
+   class DeviceInfo(BaseModel):
+       device_id: str
+       serial_number: str
+       transmitter_id: Optional[str] = None
+   
+   class GlucoseReading(BaseModel):
+       user_id: str
+       timestamp: datetime
+       glucose_value: float = Field(..., ge=20, le=600)  # Validate physiological range
+       glucose_unit: str = "mg/dL"
+       trend_direction: Literal["rising", "rising_rapidly", "steady", "falling", "falling_rapidly"]
+       device_info: DeviceInfo
+       reading_type: Literal["CGM", "manual"] = "CGM"
+       source: str = "dexcom"
+       created_at: datetime = Field(default_factory=datetime.utcnow)
+       updated_at: datetime = Field(default_factory=datetime.utcnow)
+   ```
+
+3. Create DynamoDB table creation/management utilities
+4. Implement data access layer for each table with CRUD operations
+5. Add indexes for efficient querying (GSI on user_id + created_at)
+6. Implement pagination support for query results
+7. Add TTL configuration for data retention policies
+
+**Implementation Status:**
+
+✅ Implemented Pydantic models for all required data types:
+   - Glucose readings with device info and trend directions
+   - User authentication tokens with expiration handling
+   - Synchronization jobs with status tracking
+
+✅ Created DynamoDB table definitions with appropriate indexes:
+   - Blood glucose readings table with user+timestamp composite key and created_at index
+   - User tokens table with user+provider composite key
+   - Sync jobs table with job_id key and status+scheduled indexes
+
+✅ Implemented repository classes for each model with:
+   - CRUD operations (create, read, update, delete)
+   - Efficient query methods for common access patterns
+   - Batch operations for high-throughput scenarios
+   - Data conversion between Pydantic models and DynamoDB items
+
+✅ Added comprehensive unit tests covering:
+   - Model validation and constraints
+   - DynamoDB table creation and configuration
+   - Conversion between models and DynamoDB items
+   - Repository operations using mocked DynamoDB
+
+✅ Created utility script for local development table creation
+
+All code follows best practices with proper type annotations, docstrings, and error handling. Repository classes are implemented as singletons for efficient reuse throughout the application.
+
+# Test Strategy:
+1. Unit tests for Pydantic model validation
+2. Integration tests with DynamoDB local for table operations
+3. Test data access layer CRUD operations
+4. Verify query performance with sample data
+5. Test pagination functionality
+6. Validate error handling for DynamoDB operations
+
+**Test Implementation Status:**
+
+✅ Implemented comprehensive unit tests for:
+   - Model validation and constraints
+   - DynamoDB table creation and configuration
+   - Conversion between models and DynamoDB items
+   - Repository operations using mocked DynamoDB

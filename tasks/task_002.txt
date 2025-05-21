@@ -1,0 +1,177 @@
+# Task ID: 2
+# Title: Implement Environment Configuration
+# Status: done
+# Dependencies: 1
+# Priority: high
+# Description: Create a configuration system to manage environment variables and secrets for different deployment environments.
+# Details:
+1. Create a configuration module using Pydantic BaseSettings
+2. Implement environment variable loading for all required configs:
+   - AWS configuration (region, credentials)
+   - DynamoDB settings (endpoint, table names)
+   - RabbitMQ settings (URL, exchange, queue)
+   - Dexcom API settings (client ID, secret, URLs)
+   - Service settings (environment, log level, intervals)
+3. Add validation for required settings
+4. Implement AWS Secrets Manager integration for sensitive values
+5. Create environment-specific configuration files (.env.example, .env.development)
+6. Add fallback mechanisms for development environments
+7. Implement configuration singleton pattern for app-wide access
+
+Example code:
+```python
+from pydantic import BaseSettings, Field
+
+class Settings(BaseSettings):
+    # AWS Configuration
+    aws_region: str = Field(..., env="AWS_REGION")
+    aws_access_key_id: str = Field(..., env="AWS_ACCESS_KEY_ID")
+    aws_secret_access_key: str = Field(..., env="AWS_SECRET_ACCESS_KEY")
+    
+    # DynamoDB Configuration
+    dynamodb_endpoint: str = Field(..., env="DYNAMODB_ENDPOINT")
+    dynamodb_table: str = Field(..., env="DYNAMODB_TABLE")
+    dynamodb_user_tokens_table: str = Field(..., env="DYNAMODB_USER_TOKENS_TABLE")
+    dynamodb_sync_jobs_table: str = Field(..., env="DYNAMODB_SYNC_JOBS_TABLE")
+    
+    # Additional settings...
+    
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+
+settings = Settings()
+```
+
+# Test Strategy:
+1. Unit tests for configuration loading from environment variables
+2. Tests for validation of required settings
+3. Mock AWS Secrets Manager for testing secret loading
+4. Test configuration with different environment files
+5. Verify error handling for missing required variables
+
+# Subtasks:
+## 1. Core Settings Model Implementation [completed]
+### Dependencies: None
+### Description: Create a Pydantic-based settings model that defines all configuration parameters for the application
+### Details:
+1. Define a BaseSettings class using Pydantic that includes all required configuration parameters
+2. Implement type hints and default values for all settings
+3. Add documentation for each setting field
+4. Include environment variable mapping using Pydantic's env_prefix and env_names
+5. Implement nested configuration models for complex settings groups
+6. Add custom validators for specific fields that require validation logic
+7. Test the model with various input combinations to ensure proper parsing and validation
+<info added on 2025-05-18T06:36:16.886Z>
+1. Define a BaseSettings class using Pydantic that includes all required configuration parameters
+2. Implement type hints and default values for all settings
+3. Add documentation for each setting field
+4. Include environment variable mapping using Pydantic's env_prefix and env_names
+5. Implement nested configuration models for complex settings groups
+6. Add custom validators for specific fields that require validation logic
+7. Test the model with various input combinations to ensure proper parsing and validation
+
+Implementation Plan:
+- Target File: projects/services/bg-ingest/src/utils/config.py
+- Create a Pydantic-based Settings class that inherits from BaseSettings
+- Review existing configuration parameters against Task 2 requirements to ensure completeness
+- Add service-specific settings like poll_interval_seconds and any other timing/interval parameters
+- Use appropriate type hints (str, int, bool, List, Dict, Optional) for all parameters
+- Set sensible default values for non-sensitive parameters, use Optional[str] = None for sensitive keys
+- Add comprehensive docstrings/comments for each field explaining purpose and constraints
+- Configure environment variable mapping with SettingsConfigDict, evaluating whether to use a service-specific prefix (BG_INGEST_)
+- Consider organizing related settings into nested models (AWSSettings, DynamoDBSettings) if it improves code organization
+- Implement custom validators for fields requiring validation (URLs, enum values, ID formats, etc.)
+- Create a cors_origins validator to handle comma-separated string conversion to list
+- Develop unit tests in projects/services/bg-ingest/tests/utils/test_config.py to verify parsing and validation
+- Test with various input combinations including environment variables and .env files
+</info added on 2025-05-18T06:36:16.886Z>
+<info added on 2025-05-18T06:41:46.833Z>
+The Core Settings Model has been successfully implemented in `projects/services/bg-ingest/src/utils/config.py` with a well-organized structure using nested Pydantic models. The implementation includes:
+
+1. A main `Settings` class that organizes configuration into logical groupings through nested models:
+   - `ServiceSettings`: Core service configuration including CORS settings
+   - `AWSSettings`: AWS-specific configuration parameters
+   - `DynamoDBSettings`: DynamoDB connection and table settings
+   - `RabbitMQSettings`: Message queue configuration
+   - `DexcomAPISettings`: Dexcom API integration settings
+   - `SyncSettings`: Data synchronization parameters
+
+2. Environment variable configuration:
+   - Set `env_prefix="BG_INGEST_"` to namespace all environment variables
+   - Added support for overriding the .env file path via an `ENV_FILE` environment variable
+   - Configured `extra='ignore'` to gracefully handle undefined environment variables
+
+3. Field validation:
+   - Implemented a validator for `cors_origins` that handles comma-separated strings from environment variables
+   - Added appropriate type hints and default values for all settings
+   - Included documentation for each setting field
+
+4. The nested model structure provides better organization and maintainability while ensuring all configuration requirements from the PRD are met.
+
+This implementation completes all the requirements outlined in the task details and provides a robust foundation for the environment-specific configuration files that will be implemented in the next subtask.
+</info added on 2025-05-18T06:41:46.833Z>
+
+## 2. Environment-specific Configuration Files [completed]
+### Dependencies: 2.1
+### Description: Create configuration files for different environments (development, staging, production) with appropriate default values
+### Details:
+1. Create a directory structure for environment-specific configuration files
+2. Implement YAML or JSON configuration files for each environment (dev, staging, prod)
+3. Define environment detection logic based on environment variables
+4. Create a configuration loading mechanism that selects the appropriate file based on the detected environment
+5. Implement override logic where environment variables take precedence over file-based configuration
+6. Add logging for configuration loading process
+7. Test configuration loading in different environments to ensure correct values are loaded
+
+## 3. AWS Secrets Manager Integration [completed]
+### Dependencies: 2.1
+### Description: Implement secure access to sensitive configuration values stored in AWS Secrets Manager
+### Details:
+1. Set up AWS SDK with appropriate authentication
+2. Create a SecretsManager client with proper error handling
+3. Implement a function to retrieve secrets by name/path
+4. Add caching mechanism to avoid repeated API calls
+5. Implement secret rotation handling
+6. Create a mechanism to inject secrets into the configuration model
+7. Add unit tests with mocked AWS responses
+8. Document security best practices for accessing secrets
+
+## 4. Configuration Validation [completed]
+### Dependencies: 2.1, 2.2, 2.3
+### Description: Implement comprehensive validation for configuration values to ensure system integrity
+### Details:
+1. Define custom validators for complex business rules
+2. Implement cross-field validation logic
+3. Add environment-specific validation rules
+4. Create validation for external service connection parameters
+5. Implement validation reporting with clear error messages
+6. Add validation for secret values retrieved from AWS Secrets Manager
+7. Create unit tests for all validation scenarios
+8. Implement a validation summary report
+
+## 5. Configuration Singleton Pattern Implementation [completed]
+### Dependencies: 2.1, 2.2, 2.3, 2.4
+### Description: Implement a thread-safe singleton pattern for configuration access throughout the application
+### Details:
+1. Create a ConfigurationManager class implementing the singleton pattern
+2. Ensure thread-safety using appropriate locking mechanisms
+3. Implement lazy loading of configuration values
+4. Add methods for accessing specific configuration sections
+5. Implement refresh capability for updating configuration at runtime
+6. Create helper methods for common configuration access patterns
+7. Add comprehensive documentation with usage examples
+8. Write unit tests to verify singleton behavior and thread safety
+
+## 6. Configuration Documentation [completed]
+### Dependencies: 2.1, 2.2, 2.3, 2.4, 2.5
+### Description: Create comprehensive documentation for the configuration system in the project README
+### Details:
+1. Document the overall configuration architecture
+2. Provide examples of setting up configuration for different environments
+3. Explain how to manage sensitive values with AWS Secrets Manager
+4. Document all available configuration parameters with descriptions
+5. Include troubleshooting guidance for common configuration issues
+6. Add examples of accessing configuration values in application code
+7. Document best practices for configuration management
+

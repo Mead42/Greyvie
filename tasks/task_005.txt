@@ -1,0 +1,53 @@
+# Task ID: 5
+# Title: Develop Dexcom API Client
+# Status: pending
+# Dependencies: 4
+# Priority: high
+# Description: Create a client for interacting with the Dexcom API, including rate limiting, retry mechanisms, and error handling.
+# Details:
+1. Create a Dexcom API client class using httpx
+2. Implement methods for fetching glucose readings:
+   ```python
+   class DexcomApiClient:
+       def __init__(self, base_url: str, access_token: str):
+           self.base_url = base_url
+           self.client = httpx.AsyncClient(
+               base_url=base_url,
+               headers={"Authorization": f"Bearer {access_token}"}
+           )
+           self.rate_limiter = RateLimiter(max_calls=100, period=60)  # 100 calls per minute
+       
+       async def get_glucose_readings(self, start_date: datetime, end_date: datetime) -> List[Dict]:
+           async with self.rate_limiter:
+               endpoint = "/v2/users/self/egvs"
+               params = {
+                   "startDate": start_date.isoformat(),
+                   "endDate": end_date.isoformat()
+               }
+               
+               response = await self.client.get(endpoint, params=params)
+               
+               if response.status_code == 429:  # Rate limited
+                   retry_after = int(response.headers.get("Retry-After", 60))
+                   await asyncio.sleep(retry_after)
+                   return await self.get_glucose_readings(start_date, end_date)
+               
+               response.raise_for_status()
+               return response.json()["egvs"]
+   ```
+
+3. Implement exponential backoff for failed requests
+4. Add circuit breaker pattern for API outages
+5. Support both sandbox and production environments
+6. Implement webhook registration with Dexcom API
+7. Add comprehensive logging for API interactions
+8. Create metrics tracking for API calls
+
+# Test Strategy:
+1. Unit tests with mocked HTTP responses
+2. Test rate limiting functionality
+3. Verify retry mechanism with simulated failures
+4. Test circuit breaker functionality
+5. Integration tests with Dexcom sandbox environment
+6. Verify error handling for various API responses
+7. Test logging and metrics collection

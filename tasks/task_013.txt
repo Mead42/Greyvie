@@ -1,0 +1,113 @@
+# Task ID: 13
+# Title: Implement Logging and Monitoring
+# Status: pending
+# Dependencies: 1
+# Priority: medium
+# Description: Set up comprehensive logging, metrics collection, and monitoring for the BG Ingest Service.
+# Details:
+1. Configure structured JSON logging:
+   ```python
+   import logging
+   import json
+   from datetime import datetime
+   
+   class JSONFormatter(logging.Formatter):
+       def format(self, record):
+           log_record = {
+               "timestamp": datetime.utcnow().isoformat(),
+               "level": record.levelname,
+               "message": record.getMessage(),
+               "module": record.module,
+               "function": record.funcName,
+               "line": record.lineno
+           }
+           
+           # Add exception info if available
+           if record.exc_info:
+               log_record["exception"] = self.formatException(record.exc_info)
+           
+           # Add extra fields from record
+           if hasattr(record, "extra"):
+               log_record.update(record.extra)
+           
+           return json.dumps(log_record)
+   
+   def setup_logging(level=logging.INFO):
+       logger = logging.getLogger("bg_ingest")
+       logger.setLevel(level)
+       
+       # Create console handler
+       handler = logging.StreamHandler()
+       handler.setFormatter(JSONFormatter())
+       logger.addHandler(handler)
+       
+       return logger
+   ```
+
+2. Implement request ID tracking:
+   ```python
+   @app.middleware("http")
+   async def add_request_id(request: Request, call_next):
+       request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+       request.state.request_id = request_id
+       
+       # Add request ID to logger context
+       logger = logging.getLogger("bg_ingest")
+       logger = logger.bind(request_id=request_id)
+       
+       response = await call_next(request)
+       response.headers["X-Request-ID"] = request_id
+       
+       return response
+   ```
+
+3. Create metrics collection:
+   - API response times by endpoint
+   - Error rates and types
+   - Token refresh success/failure rates
+   - Data volume metrics
+   - Webhook processing times
+   - Sync job completion rates
+
+4. Implement health check endpoint:
+   ```python
+   @app.get("/health")
+   async def health_check():
+       health = {
+           "status": "healthy",
+           "timestamp": datetime.utcnow().isoformat(),
+           "version": settings.app_version,
+           "dependencies": {}
+       }
+       
+       # Check DynamoDB
+       try:
+           await db_client.ping()
+           health["dependencies"]["dynamodb"] = "healthy"
+       except Exception as e:
+           health["dependencies"]["dynamodb"] = {"status": "unhealthy", "error": str(e)}
+           health["status"] = "degraded"
+       
+       # Check RabbitMQ
+       try:
+           await rabbitmq_manager.ping()
+           health["dependencies"]["rabbitmq"] = "healthy"
+       except Exception as e:
+           health["dependencies"]["rabbitmq"] = {"status": "unhealthy", "error": str(e)}
+           health["status"] = "degraded"
+       
+       return health
+   ```
+
+5. Create metrics endpoint for Prometheus scraping
+6. Implement custom logging for critical operations
+7. Add performance tracing for slow operations
+
+# Test Strategy:
+1. Verify structured logging format
+2. Test request ID propagation
+3. Verify health check endpoint with mocked dependencies
+4. Test metrics collection for accuracy
+5. Verify log levels work correctly
+6. Test performance tracing functionality
+7. Verify metrics endpoint returns correct data

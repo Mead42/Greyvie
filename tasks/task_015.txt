@@ -1,0 +1,122 @@
+# Task ID: 15
+# Title: Create API Documentation and Deployment Configuration
+# Status: pending
+# Dependencies: 11, 13, 14
+# Priority: medium
+# Description: Create comprehensive API documentation using OpenAPI/Swagger and set up deployment configuration for containerized deployment.
+# Details:
+1. Configure OpenAPI documentation:
+   ```python
+   app = FastAPI(
+       title="BG Ingest Service",
+       description="Service for ingesting blood glucose readings from Dexcom API",
+       version="1.0.0",
+       docs_url="/docs",
+       redoc_url="/redoc",
+       openapi_url="/openapi.json"
+   )
+   ```
+
+2. Add detailed endpoint documentation:
+   ```python
+   @router.get(
+       "/api/bg/{user_id}/latest",
+       response_model=SuccessResponse[GlucoseReading],
+       summary="Get latest glucose reading",
+       description="Returns the most recent glucose reading for the specified user",
+       responses={
+           200: {"description": "Latest glucose reading"},
+           304: {"description": "Not modified (if ETag matches)"},
+           404: {"description": "No readings found"},
+           429: {"description": "Rate limit exceeded"}
+       },
+       tags=["Glucose Readings"]
+   )
+   async def get_latest_reading(...):
+       # Implementation
+   ```
+
+3. Create example request/response documentation
+4. Implement authentication documentation
+5. Create Dockerfile:
+   ```dockerfile
+   FROM python:3.11-slim
+   
+   WORKDIR /app
+   
+   # Install Poetry
+   RUN pip install poetry==1.4.2
+   
+   # Copy poetry configuration files
+   COPY pyproject.toml poetry.lock* /app/
+   
+   # Configure poetry to not use virtual environments
+   RUN poetry config virtualenvs.create false
+   
+   # Install dependencies
+   RUN poetry install --no-dev --no-interaction --no-ansi
+   
+   # Copy application code
+   COPY . /app/
+   
+   # Expose port
+   EXPOSE 8000
+   
+   # Run application
+   CMD ["uvicorn", "bg_ingest.main:app", "--host", "0.0.0.0", "--port", "8000"]
+   ```
+
+6. Create Docker Compose configuration:
+   ```yaml
+   version: '3.8'
+   
+   services:
+     app:
+       build: .
+       ports:
+         - "8000:8000"
+       environment:
+         - AWS_REGION=${AWS_REGION}
+         - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+         - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+         - DYNAMODB_ENDPOINT=${DYNAMODB_ENDPOINT}
+         - DYNAMODB_TABLE=${DYNAMODB_TABLE}
+         - DYNAMODB_USER_TOKENS_TABLE=${DYNAMODB_USER_TOKENS_TABLE}
+         - DYNAMODB_SYNC_JOBS_TABLE=${DYNAMODB_SYNC_JOBS_TABLE}
+         - RABBITMQ_URL=${RABBITMQ_URL}
+         - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
+         - RABBITMQ_QUEUE=${RABBITMQ_QUEUE}
+         - DEXCOM_CLIENT_ID=${DEXCOM_CLIENT_ID}
+         - DEXCOM_CLIENT_SECRET=${DEXCOM_CLIENT_SECRET}
+         - DEXCOM_REDIRECT_URI=${DEXCOM_REDIRECT_URI}
+         - DEXCOM_API_BASE_URL=${DEXCOM_API_BASE_URL}
+         - SERVICE_ENV=${SERVICE_ENV}
+         - LOG_LEVEL=${LOG_LEVEL}
+       depends_on:
+         - dynamodb-local
+         - rabbitmq
+   
+     dynamodb-local:
+       image: amazon/dynamodb-local
+       ports:
+         - "8000:8000"
+       command: "-jar DynamoDBLocal.jar -sharedDb"
+   
+     rabbitmq:
+       image: rabbitmq:3-management
+       ports:
+         - "5672:5672"
+         - "15672:15672"
+   ```
+
+7. Create deployment documentation
+8. Implement environment-specific configuration
+
+# Test Strategy:
+1. Verify OpenAPI documentation is correctly generated
+2. Test Docker build process
+3. Verify Docker Compose configuration works
+4. Test deployment in development environment
+5. Verify environment-specific configuration works
+6. Test API documentation for completeness
+7. Verify example requests/responses are accurate

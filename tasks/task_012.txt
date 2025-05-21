@@ -1,0 +1,104 @@
+# Task ID: 12
+# Title: Implement Event Publishing to RabbitMQ
+# Status: pending
+# Dependencies: 7, 8, 9
+# Priority: medium
+# Description: Create a service to publish events to RabbitMQ when new blood glucose readings are processed or when significant events occur.
+# Details:
+1. Create RabbitMQ connection manager:
+   ```python
+   class RabbitMQManager:
+       def __init__(self, url: str, exchange: str, queue: str):
+           self.url = url
+           self.exchange = exchange
+           self.queue = queue
+           self.connection = None
+           self.channel = None
+       
+       async def connect(self):
+           # Create connection
+           self.connection = await aio_pika.connect_robust(self.url)
+           self.channel = await self.connection.channel()
+           
+           # Declare exchange
+           await self.channel.declare_exchange(
+               self.exchange,
+               aio_pika.ExchangeType.TOPIC,
+               durable=True
+           )
+           
+           # Declare queue
+           queue = await self.channel.declare_queue(
+               self.queue,
+               durable=True
+           )
+           
+           # Bind queue to exchange
+           await queue.bind(self.exchange, routing_key="bg.#")
+       
+       async def publish(self, routing_key: str, message: Dict):
+           if not self.connection or self.connection.is_closed:
+               await self.connect()
+           
+           # Create message
+           message_body = json.dumps(message).encode()
+           message = aio_pika.Message(
+               body=message_body,
+               delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+               content_type="application/json"
+           )
+           
+           # Publish message
+           exchange = await self.channel.get_exchange(self.exchange)
+           await exchange.publish(message, routing_key=routing_key)
+   ```
+
+2. Implement event types and schemas:
+   - `bg.reading.new`: New glucose reading
+   - `bg.reading.updated`: Updated glucose reading
+   - `bg.sync.completed`: Sync job completed
+   - `bg.auth.token_refreshed`: Token refreshed
+   - `bg.auth.token_expired`: Token expired
+
+3. Create event publishing service:
+   ```python
+   class EventPublisher:
+       def __init__(self, rabbitmq_manager: RabbitMQManager):
+           self.rabbitmq = rabbitmq_manager
+       
+       async def publish_new_reading(self, user_id: str, reading: GlucoseReading):
+           await self.rabbitmq.publish(
+               routing_key=f"bg.reading.new.{user_id}",
+               message={
+                   "event_type": "bg.reading.new",
+                   "user_id": user_id,
+                   "timestamp": datetime.utcnow().isoformat(),
+                   "data": reading.dict()
+               }
+           )
+       
+       async def publish_sync_completed(self, user_id: str, result: SyncResult):
+           await self.rabbitmq.publish(
+               routing_key=f"bg.sync.completed.{user_id}",
+               message={
+                   "event_type": "bg.sync.completed",
+                   "user_id": user_id,
+                   "timestamp": datetime.utcnow().isoformat(),
+                   "data": result.dict()
+               }
+           )
+   ```
+
+4. Integrate event publishing with data processing pipeline
+5. Implement error handling and retry for failed publishes
+6. Add dead letter queue for failed messages
+7. Create metrics for event publishing
+
+# Test Strategy:
+1. Unit tests for event publisher with mocked RabbitMQ
+2. Integration tests with actual RabbitMQ instance
+3. Test event schemas for correctness
+4. Verify error handling for connection failures
+5. Test retry mechanism for failed publishes
+6. Verify dead letter queue functionality
+7. Test with high volume of events

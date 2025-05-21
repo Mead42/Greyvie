@@ -1,0 +1,110 @@
+# Task ID: 4
+# Title: Implement OAuth2 Authentication with Dexcom API
+# Status: done
+# Dependencies: 2, 3
+# Priority: high
+# Description: Develop the OAuth2 authorization code flow with PKCE for authenticating with the Dexcom API and managing tokens.
+# Details:
+1. Create an authentication service module
+2. Implement OAuth2 authorization code flow with PKCE:
+   - Generate code verifier and challenge
+   - Build authorization URL
+   - Handle redirect and token exchange
+   - Store tokens securely in DynamoDB
+
+3. Implement token management:
+   - Token validation
+   - Automatic token refresh before expiration
+   - Token revocation handling
+
+4. Create API endpoints for OAuth flow:
+   ```python
+   @router.post("/oauth/authorize")
+   async def authorize(request: AuthorizeRequest):
+       # Generate PKCE code challenge
+       code_verifier, code_challenge = generate_pkce_pair()
+       
+       # Store code verifier in session or temporary storage
+       await store_code_verifier(request.client_id, code_verifier)
+       
+       # Build authorization URL
+       auth_url = build_dexcom_auth_url(
+           client_id=settings.dexcom_client_id,
+           redirect_uri=settings.dexcom_redirect_uri,
+           state=request.state,
+           code_challenge=code_challenge
+       )
+       
+       return {"authorization_url": auth_url}
+   
+   @router.get("/oauth/callback")
+   async def oauth_callback(code: str, state: str):
+       # Retrieve code verifier
+       code_verifier = await get_code_verifier(state)
+       
+       # Exchange code for tokens
+       tokens = await exchange_code_for_tokens(
+           code=code,
+           code_verifier=code_verifier,
+           client_id=settings.dexcom_client_id,
+           client_secret=settings.dexcom_client_secret,
+           redirect_uri=settings.dexcom_redirect_uri
+       )
+       
+       # Store tokens
+       user_id = extract_user_id_from_tokens(tokens)
+       await store_user_tokens(user_id, tokens)
+       
+       return {"status": "success", "user_id": user_id}
+   ```
+
+5. Implement secure token storage in DynamoDB
+6. Add token refresh scheduler to prevent expiration
+7. Implement error handling for authentication failures
+
+# Test Strategy:
+1. Unit tests for PKCE code generation
+2. Mock tests for Dexcom API authentication flow
+3. Integration tests for token storage and retrieval
+4. Test token refresh functionality
+5. Verify error handling for authentication failures
+6. Test token validation logic
+7. Security testing for token storage
+
+# Subtasks:
+## 1. Implement PKCE Code Generation [done]
+### Dependencies: None
+### Description: Create functions to generate cryptographically secure code verifier and code challenge for PKCE flow
+### Details:
+Implement functions to: 1) Generate a random code verifier of appropriate length (43-128 chars), 2) Create SHA256 hash of the verifier, 3) Base64-URL encode the hash to produce the code challenge, 4) Add unit tests verifying correct format and cryptographic properties, 5) Document security considerations regarding verifier entropy and storage
+
+## 2. Build Authorization URL Constructor [done]
+### Dependencies: 4.1
+### Description: Create a function to build the OAuth2 authorization URL with all required parameters
+### Details:
+Implement a function that: 1) Accepts client_id, redirect_uri, scope, and state parameters, 2) Incorporates the PKCE code challenge from subtask 1, 3) Properly URL-encodes all parameters, 4) Includes test cases for various parameter combinations, 5) Documents security considerations for state parameter usage and redirect validation
+
+## 3. Implement Token Exchange Mechanism [done]
+### Dependencies: 4.1, 4.2
+### Description: Create functions to exchange authorization code for access and refresh tokens
+### Details:
+Implement code to: 1) Make POST request to token endpoint with authorization code, code verifier, client_id, and redirect_uri, 2) Parse and validate token response, 3) Handle error responses appropriately, 4) Add test cases for successful exchange and various error conditions, 5) Document security considerations for transport security and token validation
+
+## 4. Develop Secure Token Storage [done]
+### Dependencies: 4.3
+### Description: Implement secure storage mechanism for access and refresh tokens
+### Details:
+Create a storage system that: 1) Securely stores access token, refresh token, expiration times, and token metadata, 2) Encrypts sensitive token data at rest, 3) Provides methods to retrieve, update, and clear tokens, 4) Includes test cases for storage operations and encryption, 5) Documents security considerations for storage location and encryption methods
+
+## 5. Implement Token Refresh Mechanism [done]
+### Dependencies: 4.3, 4.4
+### Description: Create automatic token refresh functionality using refresh tokens
+### Details:
+Implement code to: 1) Check token expiration before API calls, 2) Automatically refresh access token using refresh token when expired, 3) Update stored tokens after successful refresh, 4) Handle refresh failures appropriately, 5) Add test cases for refresh scenarios including expired refresh tokens, 6) Document security considerations for refresh token rotation
+
+## 6. Create OAuth2 API Client Implementation [done]
+### Dependencies: 4.2, 4.3, 4.4, 4.5
+### Description: Implement API client that incorporates the OAuth2 authentication flow
+### Details:
+Create an API client that: 1) Provides methods to initiate authorization, handle redirects, and make authenticated API calls, 2) Automatically manages token lifecycle, 3) Implements proper error handling for authentication failures, 4) Includes integration tests with mock OAuth server, 5) Documents security considerations for API usage and error handling, 6) Provides usage examples for common scenarios
+

@@ -1,0 +1,68 @@
+# Task ID: 9
+# Title: Implement Webhook Processing
+# Status: pending
+# Dependencies: 5, 6, 7
+# Priority: medium
+# Description: Create an endpoint and processing system for receiving and handling real-time webhook notifications from Dexcom.
+# Details:
+1. Create webhook receiver endpoint:
+   ```python
+   @router.post("/api/bg/{user_id}/webhook")
+   async def webhook_handler(user_id: str, request: Request, background_tasks: BackgroundTasks):
+       # Validate webhook signature if available
+       signature = request.headers.get("X-Dexcom-Signature")
+       if signature:
+           payload = await request.body()
+           is_valid = validate_webhook_signature(payload, signature, settings.dexcom_webhook_secret)
+           if not is_valid:
+               raise HTTPException(status_code=401, detail="Invalid webhook signature")
+       
+       # Parse webhook payload
+       payload = await request.json()
+       
+       # Process asynchronously
+       background_tasks.add_task(process_webhook, user_id, payload)
+       
+       # Return accepted response immediately
+       return Response(status_code=202)
+   ```
+
+2. Implement webhook payload processing:
+   ```python
+   async def process_webhook(user_id: str, payload: Dict):
+       try:
+           # Extract notification type
+           notification_type = payload.get("type")
+           
+           if notification_type == "new_readings":
+               # Get time range from notification
+               start_time = parse_iso_datetime(payload["startTime"])
+               end_time = parse_iso_datetime(payload["endTime"])
+               
+               # Trigger sync for this specific time range
+               await sync_service.sync_user_data(user_id, start_time, end_time)
+           elif notification_type == "device_update":
+               # Handle device update notifications
+               logger.info(f"Device update for user {user_id}: {payload}")
+           else:
+               logger.warning(f"Unknown notification type: {notification_type}")
+       except Exception as e:
+           logger.error(f"Error processing webhook: {e}")
+           # Store failed webhook for retry
+           await store_failed_webhook(user_id, payload)
+   ```
+
+3. Implement webhook signature validation
+4. Create webhook registration with Dexcom API
+5. Add retry mechanism for failed webhook processing
+6. Implement metrics for webhook processing times
+7. Create logging for webhook events
+
+# Test Strategy:
+1. Unit tests for webhook handler with mock requests
+2. Test webhook signature validation
+3. Integration tests for webhook processing
+4. Verify asynchronous processing works correctly
+5. Test error handling for malformed webhooks
+6. Verify metrics collection for webhook processing
+7. Test retry mechanism for failed webhooks

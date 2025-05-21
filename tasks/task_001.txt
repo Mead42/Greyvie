@@ -1,0 +1,115 @@
+# Task ID: 1
+# Title: Setup Project Structure and Dependencies
+# Status: done
+# Dependencies: None
+# Priority: high
+# Description: Initialize the project repository with the required structure and dependencies for the BG Ingest Service.
+# Details:
+1. Create a new Python project using Poetry
+2. Configure Python 3.11 as the required version
+3. Add core dependencies:
+   - FastAPI for API framework
+   - Pydantic for data validation
+   - Uvicorn for ASGI server
+   - boto3 for AWS services
+   - httpx for HTTP client
+   - pika for RabbitMQ integration
+4. Set up development dependencies:
+   - pytest for testing
+   - mypy for type checking
+   - black and isort for formatting
+   - flake8 for linting
+5. Create Docker and Docker Compose files for containerization
+6. Set up basic project structure:
+   ```
+   bg_ingest/
+     ├── api/
+     ├── auth/
+     ├── data/
+     ├── models/
+     ├── services/
+     ├── utils/
+     └── main.py
+   tests/
+   ```
+7. Configure CI pipeline with GitHub Actions
+
+# Test Strategy:
+1. Verify project structure is correctly set up
+2. Ensure all dependencies can be installed
+3. Confirm Docker container builds successfully
+4. Validate development environment works with sample code
+5. Test CI pipeline with a basic test case
+
+# Subtasks:
+## 1. Initialize Git Repository and Project Structure [done]
+### Dependencies: None
+### Description: Set up the Git repository and create the basic project structure with necessary configuration files.
+### Details:
+1. Create a new Git repository
+2. Initialize project with Poetry (poetry init)
+3. Create standard directories (src, tests, docs)
+4. Add .gitignore file with appropriate patterns
+5. Create README.md with project overview
+6. Make initial commit
+
+Acceptance Criteria:
+- Repository initialized with proper .gitignore
+- Poetry project initialized with pyproject.toml
+- Basic directory structure in place
+- README with project description and setup instructions
+
+## 2. Configure Dependencies and Development Environment [done]
+### Dependencies: 1.1
+### Description: Set up project dependencies, development tools, and virtual environment configuration.
+### Details:
+1. Define core dependencies in pyproject.toml
+2. Add development dependencies (pytest, black, isort, mypy, etc.)
+3. Configure pre-commit hooks
+4. Set up environment variable templates
+5. Create developer setup documentation
+
+Acceptance Criteria:
+- All dependencies specified in pyproject.toml
+- Development tools configured and documented
+- Pre-commit hooks working for code quality checks
+- Virtual environment creation process documented
+- Poetry lock file generated
+
+## 3. Create Docker Configuration [done]
+### Dependencies: 1.2
+### Description: Set up Docker and docker-compose files for containerized development and deployment.
+### Details:
+1. Create Dockerfile for the application
+2. Create docker-compose.yml for local development
+3. Configure volume mappings for development
+4. Set up environment variable handling
+5. Add Docker-specific documentation
+6. Test Docker build and run processes
+
+Acceptance Criteria:
+- Dockerfile builds successfully
+- docker-compose.yml includes all necessary services
+- Container starts without errors
+- Development environment works within container
+- Documentation includes Docker usage instructions
+
+## 4. Configure CI Pipeline [done]
+### Dependencies: 1.3
+### Description: Set up continuous integration pipeline for automated testing and quality checks.
+### Details:
+1. Create CI configuration file (GitHub Actions, GitLab CI, etc.)
+2. Configure test running in CI
+3. Set up linting and type checking in CI
+4. Configure Docker build testing
+5. Add code coverage reporting
+6. Set up branch protection rules
+
+Acceptance Criteria:
+- CI pipeline configuration committed to repository
+- Pipeline runs on push and pull requests
+- All tests, linting, and type checking run in CI
+- Docker build tested in CI
+- Code coverage reports generated
+- Branch protection rules implemented
+

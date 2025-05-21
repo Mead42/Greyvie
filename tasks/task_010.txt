@@ -1,0 +1,106 @@
+# Task ID: 10
+# Title: Implement Manual Synchronization API
+# Status: pending
+# Dependencies: 8
+# Priority: medium
+# Description: Create an API endpoint for manually triggering data synchronization for a specific user with optional date range parameters.
+# Details:
+1. Create manual sync endpoint:
+   ```python
+   @router.post("/api/bg/{user_id}/sync")
+   async def manual_sync(
+       user_id: str,
+       sync_request: SyncRequest,
+       background_tasks: BackgroundTasks
+   ):
+       # Generate idempotency key if not provided
+       idempotency_key = sync_request.idempotency_key or str(uuid.uuid4())
+       
+       # Check if sync job already exists with this idempotency key
+       existing_job = await get_sync_job_by_idempotency_key(idempotency_key)
+       if existing_job:
+           return {
+               "status": "success",
+               "job_id": existing_job["job_id"],
+               "message": "Sync job already exists"
+           }
+       
+       # Create new sync job
+       job_id = str(uuid.uuid4())
+       job = {
+           "job_id": job_id,
+           "user_id": user_id,
+           "status": "pending",
+           "start_date": sync_request.start_date,
+           "end_date": sync_request.end_date,
+           "idempotency_key": idempotency_key,
+           "created_at": datetime.utcnow().isoformat()
+       }
+       
+       # Store job in database
+       await store_sync_job(job)
+       
+       # Process sync in background
+       background_tasks.add_task(process_sync_job, job)
+       
+       return {
+           "status": "success",
+           "job_id": job_id,
+           "message": "Sync job created"
+       }
+   ```
+
+2. Implement sync job processing:
+   ```python
+   async def process_sync_job(job: Dict):
+       try:
+           # Update job status
+           await update_sync_job_status(job["job_id"], "processing")
+           
+           # Get date range
+           start_date = parse_iso_datetime(job["start_date"]) if job["start_date"] else datetime.utcnow() - timedelta(days=1)
+           end_date = parse_iso_datetime(job["end_date"]) if job["end_date"] else datetime.utcnow()
+           
+           # Perform sync
+           result = await sync_service.sync_user_data(job["user_id"], start_date, end_date)
+           
+           # Update job with results
+           await update_sync_job(
+               job_id=job["job_id"],
+               status="completed",
+               results=result.dict(),
+               completed_at=datetime.utcnow().isoformat()
+           )
+       except Exception as e:
+           logger.error(f"Error processing sync job {job['job_id']}: {e}")
+           await update_sync_job(
+               job_id=job["job_id"],
+               status="failed",
+               error=str(e),
+               completed_at=datetime.utcnow().isoformat()
+           )
+   ```
+
+3. Create job status endpoint:
+   ```python
+   @router.get("/api/jobs/{job_id}")
+   async def get_job_status(job_id: str):
+       job = await get_sync_job(job_id)
+       if not job:
+           raise HTTPException(status_code=404, detail="Job not found")
+       return job
+   ```
+
+4. Implement distributed locking to prevent concurrent syncs for same user
+5. Add idempotency key support for safe retries
+6. Create detailed job results storage
+7. Implement job cleanup for completed jobs
+
+# Test Strategy:
+1. Unit tests for manual sync endpoint
+2. Test idempotency key functionality
+3. Integration tests for full sync job workflow
+4. Verify job status updates correctly
+5. Test error handling during sync process
+6. Verify distributed locking prevents concurrent syncs
+7. Test with various date ranges

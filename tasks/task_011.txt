@@ -1,0 +1,125 @@
+# Task ID: 11
+# Title: Implement Data Retrieval API Endpoints
+# Status: done
+# Dependencies: 3
+# Priority: high
+# Description: Create API endpoints for retrieving blood glucose readings with support for filtering, pagination, and formatting.
+# Details:
+✅ Implemented data retrieval API endpoints with the following features:
+
+1. Created an API router in src/api/readings.py with:
+   - GET /api/bg/{user_id}/latest endpoint with ETag and cache control
+   - GET /api/bg/{user_id} endpoint with pagination, filtering, sorting
+   - Added formatting options (default, simple, CSV)
+   - Implemented error handling for date parsing and not found scenarios
+
+2. Implemented middleware in src/api/middleware.py:
+   - RateLimiter middleware using token bucket algorithm
+   - CacheControl middleware for adding cache headers
+   - Both are configurable and follow best practices
+
+3. Updated main.py to:
+   - Register the readings router
+   - Add middleware for rate limiting and caching
+   - Ensure database tables are created in development mode
+   - Add a metrics endpoint
+
+4. Fixed get_glucose_repository function to use lru_cache for better performance.
+
+Implementation details:
+
+1. Latest reading endpoint:
+   ```python
+   @router.get("/api/bg/{user_id}/latest")
+   async def get_latest_reading(
+       user_id: str,
+       request: Request,
+       response: Response
+   ):
+       # Get latest reading from database
+       reading = await db_client.get_latest_reading(user_id)
+       if not reading:
+           raise HTTPException(status_code=404, detail="No readings found")
+       
+       # Generate ETag
+       etag = f"\"{hash(json.dumps(reading))}\""
+       
+       # Check If-None-Match header
+       if request.headers.get("if-none-match") == etag:
+           return Response(status_code=304)
+       
+       # Set ETag and cache headers
+       response.headers["ETag"] = etag
+       response.headers["Cache-Control"] = "private, max-age=60"
+       
+       return {
+           "status": "success",
+           "data": reading
+       }
+   ```
+
+2. Readings list endpoint:
+   ```python
+   @router.get("/api/bg/{user_id}")
+   async def get_readings(
+       user_id: str,
+       start_date: Optional[str] = None,
+       end_date: Optional[str] = None,
+       limit: int = Query(100, ge=1, le=1000),
+       cursor: Optional[str] = None,
+       format: str = Query("default", regex="^(default|simple|csv)$"),
+       sort: str = Query("desc", regex="^(asc|desc)$")
+   ):
+       # Parse date parameters
+       start = parse_iso_datetime(start_date) if start_date else datetime.utcnow() - timedelta(days=1)
+       end = parse_iso_datetime(end_date) if end_date else datetime.utcnow()
+       
+       # Query database with pagination
+       result = await db_client.get_readings(
+           user_id=user_id,
+           start_date=start,
+           end_date=end,
+           limit=limit,
+           cursor=cursor,
+           sort=sort
+       )
+       
+       # Format response based on format parameter
+       if format == "csv":
+           return create_csv_response(result["items"])
+       
+       if format == "simple":
+           return result["items"]
+       
+       # Build default response with pagination links
+       response = {
+           "status": "success",
+           "data": result["items"],
+           "pagination": {
+               "count": len(result["items"]),
+               "total": result.get("total"),
+           }
+       }
+       
+       # Add next/prev cursors if available
+       if result.get("next_cursor"):
+           response["pagination"]["next"] = f"/api/bg/{user_id}?start_date={start_date}&end_date={end_date}&limit={limit}&cursor={result['next_cursor']}&format={format}&sort={sort}"
+       
+       if result.get("prev_cursor"):
+           response["pagination"]["prev"] = f"/api/bg/{user_id}?start_date={start_date}&end_date={end_date}&limit={limit}&cursor={result['prev_cursor']}&format={format}&sort={sort}"
+       
+       return response
+   ```
+
+# Test Strategy:
+✅ Completed testing for the implemented API endpoints:
+
+1. Unit tests for API endpoints with mocked database
+2. Tested pagination functionality with various limit values and cursor navigation
+3. Verified date filtering works correctly with different date formats and ranges
+4. Tested caching headers and ETag functionality for the latest reading endpoint
+5. Verified error handling for various scenarios including invalid dates and not found cases
+6. Tested rate limiting functionality with different request rates
+7. Performed performance testing with large datasets
+8. Verified different formatting options (default, simple, CSV) return correct data structures
+9. Tested sorting functionality in both ascending and descending order
