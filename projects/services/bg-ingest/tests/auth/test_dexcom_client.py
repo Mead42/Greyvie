@@ -1,6 +1,6 @@
 import pytest
 import pytest_asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from src.auth.dexcom_client import DexcomApiClient
 import httpx
 from datetime import datetime, timedelta
@@ -31,11 +31,11 @@ async def test_authenticate_success(monkeypatch):
     )
     mock_response = AsyncMock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {
+    mock_response.json = AsyncMock(return_value={
         "access_token": "access123",
         "refresh_token": "refresh123",
         "expires_in": 3600
-    }
+    })
     monkeypatch.setattr(client._client, "post", AsyncMock(return_value=mock_response))
     result = await client.authenticate("authcode", "https://myapp.com/callback")
     assert client._access_token == "access123"
@@ -70,11 +70,11 @@ async def test_refresh_access_token_success(monkeypatch):
     client._refresh_token = "refresh123"
     mock_response = AsyncMock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {
+    mock_response.json = AsyncMock(return_value={
         "access_token": "access456",
         "refresh_token": "refresh456",
         "expires_in": 3600
-    }
+    })
     monkeypatch.setattr(client._client, "post", AsyncMock(return_value=mock_response))
     result = await client.refresh_access_token()
     assert client._access_token == "access456"

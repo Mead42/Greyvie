@@ -233,7 +233,60 @@
         4
       ],
       "status": "pending",
-      "subtasks": []
+      "subtasks": [
+        {
+          "id": 1,
+          "title": "Basic Dexcom API Client Setup",
+          "description": "Implement the core API client structure with authentication, request handling, and response parsing",
+          "dependencies": [],
+          "details": "Create a client class with methods for authentication (OAuth2), endpoint configuration, HTTP request methods (GET, POST, etc.), response parsing, error handling for common HTTP errors, and data model classes for Dexcom API responses. Include unit tests for successful authentication, basic requests, and error responses.",
+          "status": "in-progress"
+        },
+        {
+          "id": 2,
+          "title": "Rate Limiting Implementation",
+          "description": "Add rate limiting capabilities to prevent API quota exhaustion",
+          "dependencies": [
+            1
+          ],
+          "details": "Implement token bucket algorithm for rate limiting, configure limits based on Dexcom API documentation, add request queuing mechanism when approaching limits, implement rate limit detection from API responses, and add backpressure handling. Write tests for rate limit detection, request throttling behavior, and queue management.",
+          "status": "pending"
+        },
+        {
+          "id": 3,
+          "title": "Retry Mechanism with Exponential Backoff",
+          "description": "Implement intelligent retry logic for transient failures",
+          "dependencies": [
+            1
+          ],
+          "details": "Create a retry strategy with exponential backoff and jitter, categorize errors as retryable vs. non-retryable, implement maximum retry attempts configuration, add timeout handling, and ensure idempotency for retried operations. Test retry behavior with mocked transient failures, timeout scenarios, and maximum retry exhaustion.",
+          "status": "pending"
+        },
+        {
+          "id": 4,
+          "title": "Circuit Breaker Pattern Implementation",
+          "description": "Add circuit breaker to prevent cascading failures during API outages",
+          "dependencies": [
+            1,
+            3
+          ],
+          "details": "Implement circuit breaker states (closed, open, half-open), configure failure thresholds and recovery timeouts, add state transition logic, implement fallback mechanisms for when circuit is open, and ensure thread-safety. Test circuit state transitions, fallback behavior, and recovery scenarios.",
+          "status": "pending"
+        },
+        {
+          "id": 5,
+          "title": "Comprehensive Logging and Monitoring",
+          "description": "Implement detailed logging and monitoring capabilities",
+          "dependencies": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "details": "Add structured logging for all API operations, implement request/response logging with PII redaction, create performance metrics collection (latency, error rates, etc.), add correlation IDs for request tracing, and implement configurable log levels. Test log output for different scenarios, verify PII redaction, and validate metrics collection.",
+          "status": "pending"
+        }
+      ]
     },
     {
       "id": 6,
