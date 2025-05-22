@@ -5,6 +5,9 @@ from src.auth.dexcom_client import DexcomApiClient
 import httpx
 from datetime import datetime, timedelta
 from src.auth.models import GlucoseReading
+import asyncio
+import time
+from src.auth.rate_limiter import AsyncRateLimiter
 
 @pytest.mark.asyncio
 async def test_get_authorization_url():
@@ -292,4 +295,69 @@ async def test_parse_response_invalid(monkeypatch):
             raise ValueError("Invalid JSON")
     response = DummyResponse()
     with pytest.raises(ValueError):
-        await client.parse_response(response) 
+        await client.parse_response(response)
+
+@pytest.mark.asyncio
+async def test_dexcom_client_sandbox_rate_limit():
+    client = DexcomApiClient(
+        base_url="https://sandbox-api.dexcom.com",
+        client_id="test_id",
+        client_secret="test_secret",
+        sandbox=True
+    )
+    assert client.rate_limiter.max_calls == 100
+    assert client.rate_limiter.period == 60
+
+@pytest.mark.asyncio
+async def test_dexcom_client_production_rate_limit():
+    client = DexcomApiClient(
+        base_url="https://api.dexcom.com",
+        client_id="test_id",
+        client_secret="test_secret",
+        sandbox=False
+    )
+    assert client.rate_limiter.max_calls == 1000
+    assert client.rate_limiter.period == 60
+
+@pytest.mark.asyncio
+async def test_dexcom_client_custom_rate_limit():
+    client = DexcomApiClient(
+        base_url="https://api.dexcom.com",
+        client_id="test_id",
+        client_secret="test_secret",
+        sandbox=False,
+        max_calls=42,
+        period=10
+    )
+    assert client.rate_limiter.max_calls == 42
+    assert client.rate_limiter.period == 10
+
+@pytest.mark.asyncio
+async def test_async_rate_limiter_burst_and_queue():
+    limiter = AsyncRateLimiter(max_calls=2, period=1)
+    results = []
+    async def task(i):
+        async with limiter:
+            results.append((i, time.monotonic()))
+    t0 = time.monotonic()
+    await asyncio.gather(*(task(i) for i in range(4)))
+    t1 = results[0][1] - t0
+    t2 = results[1][1] - t0
+    t3 = results[2][1] - t0
+    t4 = results[3][1] - t0
+    # First two should be nearly instant, next two should be delayed by at least 0.4s
+    assert t1 < 0.2
+    assert t2 < 0.2
+    assert t3 >= 0.4
+    assert t4 >= 0.4
+
+@pytest.mark.asyncio
+async def test_async_rate_limiter_refill():
+    limiter = AsyncRateLimiter(max_calls=1, period=1)
+    async with limiter:
+        pass
+    t0 = time.monotonic()
+    await asyncio.sleep(1.05)
+    async with limiter:
+        t1 = time.monotonic()
+    assert t1 - t0 >= 1.0 
