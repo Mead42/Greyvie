@@ -240,7 +240,7 @@
           "description": "Implement the core API client structure with authentication, request handling, and response parsing",
           "dependencies": [],
           "details": "Create a client class with methods for authentication (OAuth2), endpoint configuration, HTTP request methods (GET, POST, etc.), response parsing, error handling for common HTTP errors, and data model classes for Dexcom API responses. Include unit tests for successful authentication, basic requests, and error responses.",
-          "status": "in-progress"
+          "status": "done"
         },
         {
           "id": 2,
@@ -250,7 +250,7 @@
             1
           ],
           "details": "Implement token bucket algorithm for rate limiting, configure limits based on Dexcom API documentation, add request queuing mechanism when approaching limits, implement rate limit detection from API responses, and add backpressure handling. Write tests for rate limit detection, request throttling behavior, and queue management.",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": 3,

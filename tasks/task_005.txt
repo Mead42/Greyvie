@@ -53,13 +53,13 @@
 7. Test logging and metrics collection
 
 # Subtasks:
-## 1. Basic Dexcom API Client Setup [in-progress]
+## 1. Basic Dexcom API Client Setup [done]
 ### Dependencies: None
 ### Description: Implement the core API client structure with authentication, request handling, and response parsing
 ### Details:
 Create a client class with methods for authentication (OAuth2), endpoint configuration, HTTP request methods (GET, POST, etc.), response parsing, error handling for common HTTP errors, and data model classes for Dexcom API responses. Include unit tests for successful authentication, basic requests, and error responses.
 
-## 2. Rate Limiting Implementation [pending]
+## 2. Rate Limiting Implementation [done]
 ### Dependencies: 5.1
 ### Description: Add rate limiting capabilities to prevent API quota exhaustion
 ### Details:
