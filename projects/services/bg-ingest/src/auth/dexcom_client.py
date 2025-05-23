@@ -117,33 +117,44 @@ class DexcomApiClient:
     async def _with_retries(self, func, *args, **kwargs):
         """
         Retry a coroutine with exponential backoff and jitter on eligible errors.
+        Retries on:
+          - httpx.TransportError, httpx.TimeoutException (network issues)
+          - httpx.HTTPStatusError with status 429 or 5xx
+        Does NOT retry on:
+          - httpx.HTTPStatusError with status 4xx (except 429)
+        Honors Retry-After header for 429s. Uses exponential backoff + jitter otherwise.
         """
         attempt = 0
         while True:
             try:
                 return await func(*args, **kwargs)
             except (httpx.TransportError, httpx.TimeoutException) as e:
+                # Network or timeout error: always retryable
                 error_to_raise = e
                 retryable = True
             except httpx.HTTPStatusError as e:
                 error_to_raise = e
                 status = e.response.status_code
+                # Only retry on 429 or 5xx
                 if status == 429:
                     logging.warning(
                         f"Rate limit hit (429). Attempt {attempt + 1}/{self.max_retries + 1}. "
                         f"Retrying after {e.response.headers.get('Retry-After', self.base_delay * (2 ** attempt))}s. "
                         f"URL: {e.request.url}"
                     )
-                retryable = status >= 500 or status == 429
-            
-            # Only executed if an exception occurred but wasn't re-raised
+                retryable = (status == 429) or (500 <= status < 600)
+            else:
+                # Any other exception: not retryable
+                retryable = False
+                error_to_raise = RuntimeError("Unhandled case in _with_retries")
+
             attempt += 1
             if not retryable or attempt > self.max_retries:
                 raise error_to_raise
-            
+
             # Calculate delay with exponential backoff
             delay = self.base_delay * (2 ** (attempt - 1))
-            
+
             # Override with Retry-After header for 429 responses if available
             if isinstance(error_to_raise, httpx.HTTPStatusError) and error_to_raise.response.status_code == 429:
                 retry_after_header = error_to_raise.response.headers.get("Retry-After")
@@ -152,7 +163,7 @@ class DexcomApiClient:
                         delay = float(retry_after_header)
                     except ValueError:
                         logging.warning(f"Invalid Retry-After header: {retry_after_header}. Using exponential backoff: {delay}s")
-            
+
             # Add jitter to avoid thundering herd
             jitter = random.uniform(0, delay / 2)
             actual_delay = delay + jitter
