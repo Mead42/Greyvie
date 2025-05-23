@@ -135,30 +135,28 @@ class DexcomApiClient:
                         f"URL: {e.request.url}"
                     )
                 retryable = status >= 500 or status == 429
-            else:
-                retryable = False
-                error_to_raise = RuntimeError("Unhandled case in _with_retries")
-
+            
+            # Only executed if an exception occurred but wasn't re-raised
             attempt += 1
             if not retryable or attempt > self.max_retries:
                 raise error_to_raise
             
+            # Calculate delay with exponential backoff
+            delay = self.base_delay * (2 ** (attempt - 1))
+            
+            # Override with Retry-After header for 429 responses if available
             if isinstance(error_to_raise, httpx.HTTPStatusError) and error_to_raise.response.status_code == 429:
                 retry_after_header = error_to_raise.response.headers.get("Retry-After")
                 if retry_after_header:
                     try:
                         delay = float(retry_after_header)
                     except ValueError:
-                        delay = self.base_delay * (2 ** (attempt - 1))
                         logging.warning(f"Invalid Retry-After header: {retry_after_header}. Using exponential backoff: {delay}s")
-                else:
-                    delay = self.base_delay * (2 ** (attempt - 1))
-            else:
-                delay = self.base_delay * (2 ** (attempt - 1))
             
+            # Add jitter to avoid thundering herd
             jitter = random.uniform(0, delay / 2)
             actual_delay = delay + jitter
-            logging.debug(f"Retry attempt {attempt}/{self.max_retries +1}. Waiting {actual_delay:.2f}s before retrying.")
+            logging.debug(f"Retry attempt {attempt}/{self.max_retries + 1}. Waiting {actual_delay:.2f}s before retrying.")
             await asyncio.sleep(actual_delay)
 
     async def get(self, endpoint: str, params: dict = None):
