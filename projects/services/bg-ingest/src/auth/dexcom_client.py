@@ -4,6 +4,7 @@ from typing import Optional, Type, TypeVar, List
 from datetime import datetime, timedelta
 from src.auth.models import GlucoseReading
 from src.auth.rate_limiter import AsyncRateLimiter
+from src.auth.circuit_breaker import CircuitBreaker, CircuitBreakerOpenError
 import asyncio
 import logging
 
@@ -11,14 +12,14 @@ T = TypeVar('T')
 
 class DexcomApiClient:
     """
-    Dexcom API client with OAuth2, request handling, response parsing, rate limiting, and retry logic.
+    Dexcom API client with OAuth2, request handling, response parsing, rate limiting, retry logic, and circuit breaker.
     All API calls are rate-limited using a token bucket algorithm.
     - Sandbox: 100 calls per 60s (default)
     - Production: 1000 calls per 60s (default, adjust as needed)
     Limits can be overridden via constructor.
     Supports retry with exponential backoff and jitter for transient errors.
     """
-    def __init__(self, base_url: str, client_id: str, client_secret: str, sandbox: bool = True, max_calls: Optional[int] = None, period: Optional[int] = None, max_retries: int = 3, base_delay: float = 0.5):
+    def __init__(self, base_url: str, client_id: str, client_secret: str, sandbox: bool = True, max_calls: Optional[int] = None, period: Optional[int] = None, max_retries: int = 3, base_delay: float = 0.5, circuit_breaker_config: Optional[dict] = None):
         """
         Initialize the Dexcom API client.
         :param base_url: Dexcom API base URL (sandbox or production)
@@ -29,6 +30,7 @@ class DexcomApiClient:
         :param period: Period in seconds
         :param max_retries: Maximum number of retry attempts
         :param base_delay: Base delay between retry attempts in seconds
+        :param circuit_breaker_config: Configuration for the circuit breaker
         """
         self.base_url = base_url
         self.client_id = client_id
@@ -46,6 +48,9 @@ class DexcomApiClient:
         self.rate_limiter = AsyncRateLimiter(max_calls=max_calls, period=period)
         self.max_retries = max_retries
         self.base_delay = base_delay
+        # Circuit breaker
+        cb_conf = circuit_breaker_config or {}
+        self.circuit_breaker = CircuitBreaker(**cb_conf)
 
     def get_authorization_url(self, redirect_uri: str, state: Optional[str] = None) -> str:
         """
@@ -173,44 +178,73 @@ class DexcomApiClient:
     async def get(self, endpoint: str, params: dict = None):
         """
         Perform an authenticated GET request to the Dexcom API.
-        Rate limited and retried on transient errors.
+        Rate limited, circuit breaker protected, and retried on transient errors.
         """
-        async with self.rate_limiter:
-            await self._ensure_token_valid()
-            url = f"{self.base_url}{endpoint}"
-            headers = {"Authorization": f"Bearer {self._access_token}"}
-            async def do_get():
-                response = await self._client.get(url, params=params, headers=headers)
-                if response.status_code == 401:
-                    # Try refreshing token and retry once
-                    await self.refresh_access_token()
-                    headers["Authorization"] = f"Bearer {self._access_token}"
+        await self.circuit_breaker.before_request()
+        try:
+            async with self.rate_limiter:
+                await self._ensure_token_valid()
+                url = f"{self.base_url}{endpoint}"
+                headers = {"Authorization": f"Bearer {self._access_token}"}
+                async def do_get():
                     response = await self._client.get(url, params=params, headers=headers)
-                if response.status_code >= 400:
-                    raise httpx.HTTPStatusError(f"Dexcom GET failed: {response.text}", request=response.request, response=response)
-                return response
-            return await self._with_retries(do_get)
+                    if response.status_code == 401:
+                        await self.refresh_access_token()
+                        headers["Authorization"] = f"Bearer {self._access_token}"
+                        response = await self._client.get(url, params=params, headers=headers)
+                    if response.status_code >= 400:
+                        raise httpx.HTTPStatusError(f"Dexcom GET failed: {response.text}", request=response.request, response=response)
+                    return response
+                result = await self._with_retries(do_get)
+            await self.circuit_breaker.record_success()
+            return result
+        except (httpx.TransportError, httpx.TimeoutException, httpx.HTTPStatusError) as e:
+            # Only count retryable errors as failures
+            if isinstance(e, httpx.HTTPStatusError):
+                status = e.response.status_code
+                if status == 429 or (500 <= status < 600):
+                    await self.circuit_breaker.record_failure()
+            else:
+                await self.circuit_breaker.record_failure()
+            raise
+        except CircuitBreakerOpenError:
+            logging.error("Circuit breaker is OPEN. GET request blocked.")
+            raise
 
     async def post(self, endpoint: str, data: dict = None):
         """
         Perform an authenticated POST request to the Dexcom API.
-        Rate limited and retried on transient errors.
+        Rate limited, circuit breaker protected, and retried on transient errors.
         """
-        async with self.rate_limiter:
-            await self._ensure_token_valid()
-            url = f"{self.base_url}{endpoint}"
-            headers = {"Authorization": f"Bearer {self._access_token}"}
-            async def do_post():
-                response = await self._client.post(url, data=data, headers=headers)
-                if response.status_code == 401:
-                    # Try refreshing token and retry once
-                    await self.refresh_access_token()
-                    headers["Authorization"] = f"Bearer {self._access_token}"
+        await self.circuit_breaker.before_request()
+        try:
+            async with self.rate_limiter:
+                await self._ensure_token_valid()
+                url = f"{self.base_url}{endpoint}"
+                headers = {"Authorization": f"Bearer {self._access_token}"}
+                async def do_post():
                     response = await self._client.post(url, data=data, headers=headers)
-                if response.status_code >= 400:
-                    raise httpx.HTTPStatusError(f"Dexcom POST failed: {response.text}", request=response.request, response=response)
-                return response
-            return await self._with_retries(do_post)
+                    if response.status_code == 401:
+                        await self.refresh_access_token()
+                        headers["Authorization"] = f"Bearer {self._access_token}"
+                        response = await self._client.post(url, data=data, headers=headers)
+                    if response.status_code >= 400:
+                        raise httpx.HTTPStatusError(f"Dexcom POST failed: {response.text}", request=response.request, response=response)
+                    return response
+                result = await self._with_retries(do_post)
+            await self.circuit_breaker.record_success()
+            return result
+        except (httpx.TransportError, httpx.TimeoutException, httpx.HTTPStatusError) as e:
+            if isinstance(e, httpx.HTTPStatusError):
+                status = e.response.status_code
+                if status == 429 or (500 <= status < 600):
+                    await self.circuit_breaker.record_failure()
+            else:
+                await self.circuit_breaker.record_failure()
+            raise
+        except CircuitBreakerOpenError:
+            logging.error("Circuit breaker is OPEN. POST request blocked.")
+            raise
 
     async def parse_response(self, response, model: Type[T] = None) -> T:
         """
