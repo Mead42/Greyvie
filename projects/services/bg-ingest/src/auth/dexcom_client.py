@@ -9,6 +9,13 @@ import asyncio
 import logging
 from src.utils.config import get_settings, setup_logging
 import uuid
+from src.metrics import (
+    dexcom_api_call_latency_seconds,
+    dexcom_api_call_total,
+    dexcom_api_rate_limit_events_total,
+    dexcom_api_retries_total,
+    dexcom_api_circuit_breaker_state,
+)
 
 T = TypeVar('T')
 
@@ -176,72 +183,40 @@ class DexcomApiClient:
         Honors Retry-After header for 429s. Uses exponential backoff + jitter otherwise.
         """
         attempt = 0
+        method = kwargs.pop('method', 'UNKNOWN')
+        endpoint = kwargs.pop('endpoint', 'UNKNOWN')
         while True:
             try:
                 return await func(*args, **kwargs)
             except (httpx.TransportError, httpx.TimeoutException) as e:
-                # Network or timeout error: always retryable
                 error_to_raise = e
                 retryable = True
             except httpx.HTTPStatusError as e:
                 error_to_raise = e
                 status = e.response.status_code
-                # Only retry on 429 or 5xx
                 if status == 429:
-                    logger.warning(
-                        "Rate limit hit (429). Retrying.",
-                        extra={
-                            "log_type": "retry",
-                            "correlation_id": correlation_id,
-                            "attempt": attempt + 1,
-                            "max_retries": self.max_retries + 1,
-                            "retry_after": e.response.headers.get("Retry-After", self.base_delay * (2 ** attempt)),
-                            "url": str(e.request.url)
-                        }
-                    )
+                    # Increment rate limit metric
+                    dexcom_api_rate_limit_events_total.labels(endpoint=endpoint).inc()
                 retryable = (status == 429) or (500 <= status < 600)
             else:
-                # Any other exception: not retryable
                 retryable = False
                 error_to_raise = RuntimeError("Unhandled case in _with_retries")
 
             attempt += 1
+            # Increment retry metric
+            dexcom_api_retries_total.labels(method=method, endpoint=endpoint).inc()
             if not retryable or attempt > self.max_retries:
                 raise error_to_raise
-
-            # Calculate delay with exponential backoff
             delay = self.base_delay * (2 ** (attempt - 1))
-
-            # Override with Retry-After header for 429 responses if available
             if isinstance(error_to_raise, httpx.HTTPStatusError) and error_to_raise.response.status_code == 429:
                 retry_after_header = error_to_raise.response.headers.get("Retry-After")
                 if retry_after_header:
                     try:
                         delay = float(retry_after_header)
                     except ValueError:
-                        logger.warning(
-                            "Invalid Retry-After header. Using exponential backoff.",
-                            extra={
-                                "log_type": "retry",
-                                "correlation_id": correlation_id,
-                                "retry_after": retry_after_header,
-                                "delay": delay
-                            }
-                        )
-
-            # Add jitter to avoid thundering herd
+                        pass
             jitter = random.uniform(0, delay / 2)
             actual_delay = delay + jitter
-            logger.debug(
-                "Retrying after delay.",
-                extra={
-                    "log_type": "retry",
-                    "correlation_id": correlation_id,
-                    "attempt": attempt,
-                    "max_retries": self.max_retries + 1,
-                    "actual_delay": actual_delay
-                }
-            )
             await asyncio.sleep(actual_delay)
 
     async def get(self, endpoint: str, params: dict = None, correlation_id: str = None):
@@ -277,48 +252,37 @@ class DexcomApiClient:
                         response = await self._client.get(url, params=params, headers=headers)
                     if response.status_code >= 400:
                         raise httpx.HTTPStatusError(f"Dexcom GET failed: {response.text}", request=response.request, response=response)
-                    return response
-                try:
-                    result = await self._with_retries(do_get)
-                except Exception as e:
-                    latency = (datetime.utcnow() - start_time).total_seconds()
-                    logger.error(
-                        "Dexcom API error",
+                    # Log the response
+                    try:
+                        response_body = await response.json()
+                    except Exception:
+                        response_body = response.text
+                    logger.info(
+                        "Dexcom API response",
                         extra={
-                            "log_type": "error",
+                            "log_type": "response",
                             "correlation_id": correlation_id,
                             "method": "GET",
                             "url": url,
-                            "headers": redact_pii(headers),
-                            "params": redact_pii(params) if params else None,
-                            "latency": latency,
-                            "error": str(e),
+                            "status_code": response.status_code,
+                            "headers": redact_pii(dict(response.headers)),
+                            "body": redact_pii(response_body),
                         }
                     )
-                    raise
-                latency = (datetime.utcnow() - start_time).total_seconds()
+                    return response
                 try:
-                    response_json = await result.json()
-                except Exception:
-                    response_json = None
-                logger.info(
-                    "Dexcom API response",
-                    extra={
-                        "log_type": "response",
-                        "correlation_id": correlation_id,
-                        "method": "GET",
-                        "url": url,
-                        "status_code": result.status_code,
-                        "headers": redact_pii(dict(result.headers)),
-                        "body": redact_pii(response_json),
-                        "latency": latency,
-                        "response_size": len(result.content) if hasattr(result, 'content') else None,
-                    }
-                )
+                    result = await self._with_retries(do_get, method="GET", endpoint=endpoint)
+                    status = 'success'
+                except Exception as e:
+                    status = 'error'
+                    raise
+                finally:
+                    latency = (datetime.utcnow() - start_time).total_seconds()
+                    dexcom_api_call_latency_seconds.labels(method="GET", endpoint=endpoint).observe(latency)
+                    dexcom_api_call_total.labels(method="GET", endpoint=endpoint, status=status).inc()
             await self.circuit_breaker.record_success()
             return result
         except (httpx.TransportError, httpx.TimeoutException, httpx.HTTPStatusError) as e:
-            # Only count retryable errors as failures
             if isinstance(e, httpx.HTTPStatusError):
                 status = e.response.status_code
                 if status == 429 or (500 <= status < 600):
@@ -327,10 +291,8 @@ class DexcomApiClient:
                 await self.circuit_breaker.record_failure()
             raise
         except CircuitBreakerOpenError:
-            logger.error(
-                "Circuit breaker is OPEN. GET request blocked.",
-                extra={"endpoint": endpoint, "params": params}
-            )
+            # Set circuit breaker state to open
+            dexcom_api_circuit_breaker_state.labels(endpoint=endpoint).set(1)
             raise
 
     async def post(self, endpoint: str, data: dict = None, correlation_id: str = None):
@@ -366,44 +328,34 @@ class DexcomApiClient:
                         response = await self._client.post(url, data=data, headers=headers)
                     if response.status_code >= 400:
                         raise httpx.HTTPStatusError(f"Dexcom POST failed: {response.text}", request=response.request, response=response)
-                    return response
-                try:
-                    result = await self._with_retries(do_post)
-                except Exception as e:
-                    latency = (datetime.utcnow() - start_time).total_seconds()
-                    logger.error(
-                        "Dexcom API error",
+                    # Log the response
+                    try:
+                        response_body = await response.json()
+                    except Exception:
+                        response_body = response.text
+                    logger.info(
+                        "Dexcom API response",
                         extra={
-                            "log_type": "error",
+                            "log_type": "response",
                             "correlation_id": correlation_id,
                             "method": "POST",
                             "url": url,
-                            "headers": redact_pii(headers),
-                            "body": redact_pii(data) if data else None,
-                            "latency": latency,
-                            "error": str(e),
+                            "status_code": response.status_code,
+                            "headers": redact_pii(dict(response.headers)),
+                            "body": redact_pii(response_body),
                         }
                     )
-                    raise
-                latency = (datetime.utcnow() - start_time).total_seconds()
+                    return response
                 try:
-                    response_json = await result.json()
-                except Exception:
-                    response_json = None
-                logger.info(
-                    "Dexcom API response",
-                    extra={
-                        "log_type": "response",
-                        "correlation_id": correlation_id,
-                        "method": "POST",
-                        "url": url,
-                        "status_code": result.status_code,
-                        "headers": redact_pii(dict(result.headers)),
-                        "body": redact_pii(response_json),
-                        "latency": latency,
-                        "response_size": len(result.content) if hasattr(result, 'content') else None,
-                    }
-                )
+                    result = await self._with_retries(do_post, method="POST", endpoint=endpoint)
+                    status = 'success'
+                except Exception as e:
+                    status = 'error'
+                    raise
+                finally:
+                    latency = (datetime.utcnow() - start_time).total_seconds()
+                    dexcom_api_call_latency_seconds.labels(method="POST", endpoint=endpoint).observe(latency)
+                    dexcom_api_call_total.labels(method="POST", endpoint=endpoint, status=status).inc()
             await self.circuit_breaker.record_success()
             return result
         except (httpx.TransportError, httpx.TimeoutException, httpx.HTTPStatusError) as e:
@@ -415,10 +367,8 @@ class DexcomApiClient:
                 await self.circuit_breaker.record_failure()
             raise
         except CircuitBreakerOpenError:
-            logger.error(
-                "Circuit breaker is OPEN. POST request blocked.",
-                extra={"endpoint": endpoint, "data": data}
-            )
+            # Set circuit breaker state to open
+            dexcom_api_circuit_breaker_state.labels(endpoint=endpoint).set(1)
             raise
 
     async def parse_response(self, response, model: Type[T] = None) -> T:

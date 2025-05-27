@@ -6,6 +6,8 @@ from typing import Any, Dict
 
 from fastapi import FastAPI, HTTPException
 from starlette.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
 from src.utils.config import Settings, get_settings, setup_logging
 from src.data.dynamodb import get_dynamodb_client
@@ -108,23 +110,13 @@ def create_app() -> FastAPI:
         return {"status": "healthy", "service": "bg-ingest"}
     
     @app.get("/metrics")
-    async def metrics() -> Dict[str, Any]:
+    async def metrics():
         """
-        Service metrics endpoint.
-        
+        Prometheus metrics endpoint.
         Returns:
-            dict: Service metrics
+            Response: Prometheus metrics in text format
         """
-        # In a real implementation, collect metrics from various sources
-        return {
-            "status": "success",
-            "data": {
-                "active_users": 0,
-                "readings_last_24h": 0,
-                "avg_latency_ms": 0,
-                "errors_last_24h": 0
-            }
-        }
+        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
     
     return app
 

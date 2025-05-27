@@ -1,32 +1,9 @@
-# Core dependencies
-fastapi>=0.95.0
-uvicorn>=0.21.1
-pydantic>=1.10.7
-pydantic-settings>=2.0.0  # For pydantic v2 compatibility
-python-dotenv>=1.0.0
-
-# AWS
-boto3>=1.26.115
-moto>=4.1.6  # For testing
-
-# HTTP client
-httpx>=0.24.0
-requests>=2.28.2
-
-# Message broker
-pika>=1.3.1  # RabbitMQ client
-
-# Testing
-pytest>=7.3.1
-pytest-asyncio>=0.21.0
-pytest-cov>=4.1.0
-pytest-mock>=3.10.0
-
-# Code quality
-black>=23.3.0
-flake8>=6.0.0
-isort>=5.12.0
-
-# Security
-python-jose>=3.3.0  # JWT handling
-passlib>=1.7.4  # Password hashing
+fastapi
+uvicorn
+httpx
+pytest
+pytest-asyncio
+boto3
+# moto  # Uncomment if you use AWS mocks in tests
+prometheus_client
+pydantic-settings
