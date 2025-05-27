@@ -77,7 +77,7 @@ Create a retry strategy with exponential backoff and jitter, categorize errors a
 ### Details:
 Implement circuit breaker states (closed, open, half-open), configure failure thresholds and recovery timeouts, add state transition logic, implement fallback mechanisms for when circuit is open, and ensure thread-safety. Test circuit state transitions, fallback behavior, and recovery scenarios.
 
-## 5. Comprehensive Logging and Monitoring [pending]
+## 5. Comprehensive Logging and Monitoring [done]
 ### Dependencies: 5.1, 5.2, 5.3, 5.4
 ### Description: Implement detailed logging and monitoring capabilities
 ### Details:
@@ -102,7 +102,7 @@ Add structured logging for all API operations, implement request/response loggin
 - Log request method, URL, status code, latency, and response size
 - Add tests to verify PII is never logged and that logs contain required metadata
 
-## 8. Correlation IDs and Request Tracing [in-progress]
+## 8. Correlation IDs and Request Tracing [done]
 ### Dependencies: 5.1, 5.2, 5.3, 5.4
 ### Description: Enable tracing of requests across logs for debugging and monitoring. Generate a unique correlation/request ID for each API call, propagate through all logs, and allow passing a correlation ID from upstream. Add tests to ensure correlation IDs are present and consistent in logs.
 ### Details:
@@ -111,7 +111,7 @@ Add structured logging for all API operations, implement request/response loggin
 - Optionally, allow passing a correlation ID from upstream (for integration with larger systems)
 - Add tests to ensure correlation IDs are present and consistent in logs
 
-## 9. Performance Metrics Collection [pending]
+## 9. Performance Metrics Collection [done]
 ### Dependencies: 5.1, 5.2, 5.3, 5.4
 ### Description: Track and expose key performance metrics for the client. Measure and record API call latency, error rates, and success rates. Track rate limit events, retries, and circuit breaker state changes. Use a metrics library or simple stats collector. Provide a way to export or query metrics. Add tests to verify metrics are collected and reported accurately.
 ### Details:

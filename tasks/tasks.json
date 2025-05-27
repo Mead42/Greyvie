@@ -284,7 +284,7 @@
             4
           ],
           "details": "Add structured logging for all API operations, implement request/response logging with PII redaction, create performance metrics collection (latency, error rates, etc.), add correlation IDs for request tracing, and implement configurable log levels. Test log output for different scenarios, verify PII redaction, and validate metrics collection.",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": 6,
@@ -319,7 +319,7 @@
           "title": "Correlation IDs and Request Tracing",
           "description": "Enable tracing of requests across logs for debugging and monitoring. Generate a unique correlation/request ID for each API call, propagate through all logs, and allow passing a correlation ID from upstream. Add tests to ensure correlation IDs are present and consistent in logs.",
           "details": "- Generate a unique correlation/request ID for each API call (UUID4)\n- Propagate correlation ID through all logs related to a single request\n- Optionally, allow passing a correlation ID from upstream (for integration with larger systems)\n- Add tests to ensure correlation IDs are present and consistent in logs",
-          "status": "in-progress",
+          "status": "done",
           "dependencies": [
             1,
             2,
@@ -333,7 +333,7 @@
           "title": "Performance Metrics Collection",
           "description": "Track and expose key performance metrics for the client. Measure and record API call latency, error rates, and success rates. Track rate limit events, retries, and circuit breaker state changes. Use a metrics library or simple stats collector. Provide a way to export or query metrics. Add tests to verify metrics are collected and reported accurately.",
           "details": "- Measure and record API call latency, error rates, and success rates\n- Track rate limit events, retries, and circuit breaker state changes\n- Use a metrics library (e.g., prometheus_client) or a simple in-memory/exportable stats collector\n- Provide a way to export or query metrics (e.g., via a method or endpoint)\n- Add tests to verify metrics are collected and reported accurately",
-          "status": "pending",
+          "status": "done",
           "dependencies": [
             1,
             2,
