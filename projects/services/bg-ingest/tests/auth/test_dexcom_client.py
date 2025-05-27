@@ -17,8 +17,9 @@ import uuid
 import io
 
 # --- Mock methods for PII redaction test (defined at module level) ---
-async def mock_ensure_token_valid(self):
-    return None
+async def mock_ensure_token_valid(self, correlation_id: str = None):
+    """Mock implementation of _ensure_token_valid that accepts correlation_id"""
+    pass
 
 async def mock_cb_before_request(self): # Renamed to avoid conflict if used elsewhere
     return None
@@ -505,9 +506,13 @@ async def test_request_response_logging_and_pii_redaction(monkeypatch):
     class DummyResponse:
         status_code = 200
         headers = {"X-Test": "value"}
-        content = b'{"access_token": "secret", "foo": "bar"}'
+        content = b'{"access_token": "secret", "refresh_token": "refresh_secret", "foo": "bar"}'
         async def json(self):
-            return {"access_token": "secret", "foo": "bar"}
+            return {
+                "access_token": "secret",
+                "refresh_token": "refresh_secret",
+                "foo": "bar"
+            }
     
     # Patch the _client.get and _client.post to return DummyResponse
     async def fake_get(*args, **kwargs):
@@ -516,7 +521,6 @@ async def test_request_response_logging_and_pii_redaction(monkeypatch):
         return DummyResponse()
     
     # Patch _ensure_token_valid on the DexcomApiClient class for this test
-    # This is specific to DexcomApiClient, not CircuitBreaker
     monkeypatch.setattr(DexcomApiClient, "_ensure_token_valid", mock_ensure_token_valid)
 
     # Set up log capture
@@ -674,3 +678,83 @@ def test_logging_level_filtering(caplog):
         logger.handlers = original_handlers
         logger.propagate = original_propagate
         logger.setLevel(original_level)
+
+@pytest.mark.asyncio
+async def test_correlation_id_propagation(monkeypatch):
+    """
+    Test that correlation IDs are properly propagated through all operations.
+    """
+    from src.auth.dexcom_client import DexcomApiClient, logger
+    from src.auth.circuit_breaker import CircuitBreaker
+    from src.utils.config import JSONFormatter
+    
+    # Patch methods on the CircuitBreaker class
+    monkeypatch.setattr(CircuitBreaker, "before_request", mock_cb_before_request)
+    monkeypatch.setattr(CircuitBreaker, "record_success", mock_cb_record_success)
+    
+    # Prepare a fake response
+    class DummyResponse:
+        status_code = 200
+        headers = {"X-Test": "value"}
+        content = b'{"access_token": "secret", "refresh_token": "refresh_secret", "expires_in": 3600, "foo": "bar"}'
+        async def json(self):
+            return {
+                "access_token": "secret",
+                "refresh_token": "refresh_secret",
+                "expires_in": 3600,
+                "foo": "bar"
+            }
+    
+    # Patch the _client.get and _client.post to return DummyResponse
+    async def fake_get(*args, **kwargs):
+        return DummyResponse()
+    async def fake_post(*args, **kwargs):
+        return DummyResponse()
+    
+    # Set up log capture
+    string_io = io.StringIO()
+    handler = logging.StreamHandler(string_io)
+    handler.setFormatter(JSONFormatter())
+    original_handlers = logger.handlers.copy()
+    original_propagate = logger.propagate
+    logger.handlers = [handler]
+    logger.propagate = False
+    
+    try:
+        client = DexcomApiClient(
+            base_url="https://sandbox-api.dexcom.com",
+            client_id="test_id",
+            client_secret="test_secret",
+            sandbox=True
+        )
+        monkeypatch.setattr(client._client, "get", fake_get)
+        monkeypatch.setattr(client._client, "post", fake_post)
+        
+        # Use a fixed correlation_id for test
+        correlation_id = str(uuid.uuid4())
+        
+        # Test GET request
+        await client.get("/v2/users/self/egvs", correlation_id=correlation_id)
+        
+        # Test token refresh
+        await client.refresh_access_token(correlation_id=correlation_id)
+        
+        # Get all log lines
+        log_lines = [line for line in string_io.getvalue().splitlines() if line.strip()]
+        
+        # Verify correlation IDs in all logs
+        for log_line in log_lines:
+            log_json = json.loads(log_line)
+            assert "correlation_id" in log_json, f"Missing correlation_id in log: {log_json}"
+            assert log_json["correlation_id"] == correlation_id, f"Correlation ID mismatch in log: {log_json}"
+            
+            # Verify log types
+            assert "log_type" in log_json, f"Missing log_type in log: {log_json}"
+            assert log_json["log_type"] in {
+                "request", "response", "error", "retry", 
+                "token_refresh", "token_refresh_error", "token_refresh_success"
+            }, f"Invalid log_type in log: {log_json}"
+            
+    finally:
+        logger.handlers = original_handlers
+        logger.propagate = original_propagate

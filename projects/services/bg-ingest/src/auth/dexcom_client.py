@@ -104,12 +104,13 @@ class DexcomApiClient:
         self._token_expiry = datetime.utcnow() + timedelta(seconds=token_data["expires_in"])
         return token_data
 
-    async def refresh_access_token(self, refresh_token: Optional[str] = None):
+    async def refresh_access_token(self, refresh_token: Optional[str] = None, correlation_id: str = None):
         """
         Use the refresh token to obtain a new access token and refresh token.
         Update tokens and expiry on success.
         Raise httpx.HTTPStatusError on failure.
         """
+        correlation_id = correlation_id or str(uuid.uuid4())
         token_url = f"{self.base_url}/v2/oauth2/token"
         data = {
             "client_id": self.client_id,
@@ -118,23 +119,53 @@ class DexcomApiClient:
             "grant_type": "refresh_token",
         }
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        
+        logger.info(
+            "Refreshing access token",
+            extra={
+                "log_type": "token_refresh",
+                "correlation_id": correlation_id,
+                "url": token_url
+            }
+        )
+        
         response = await self._client.post(token_url, data=data, headers=headers)
         if response.status_code != 200:
+            logger.error(
+                "Token refresh failed",
+                extra={
+                    "log_type": "token_refresh_error",
+                    "correlation_id": correlation_id,
+                    "status_code": response.status_code,
+                    "error": response.text
+                }
+            )
             raise httpx.HTTPStatusError(f"Dexcom token refresh failed: {response.text}", request=response.request, response=response)
+        
         token_data = await response.json()
         self._access_token = token_data["access_token"]
         self._refresh_token = token_data["refresh_token"]
         self._token_expiry = datetime.utcnow() + timedelta(seconds=token_data["expires_in"])
+        
+        logger.info(
+            "Token refresh successful",
+            extra={
+                "log_type": "token_refresh_success",
+                "correlation_id": correlation_id,
+                "expires_in": token_data["expires_in"]
+            }
+        )
+        
         return token_data
 
-    async def _ensure_token_valid(self):
+    async def _ensure_token_valid(self, correlation_id: str = None):
         """
         Ensure the access token is valid. Refresh if expired.
         """
         if not self._access_token or not self._token_expiry or datetime.utcnow() >= self._token_expiry:
-            await self.refresh_access_token()
+            await self.refresh_access_token(correlation_id=correlation_id)
 
-    async def _with_retries(self, func, *args, **kwargs):
+    async def _with_retries(self, func, *args, correlation_id: str = None, **kwargs):
         """
         Retry a coroutine with exponential backoff and jitter on eligible errors.
         Retries on:
@@ -160,6 +191,8 @@ class DexcomApiClient:
                     logger.warning(
                         "Rate limit hit (429). Retrying.",
                         extra={
+                            "log_type": "retry",
+                            "correlation_id": correlation_id,
                             "attempt": attempt + 1,
                             "max_retries": self.max_retries + 1,
                             "retry_after": e.response.headers.get("Retry-After", self.base_delay * (2 ** attempt)),
@@ -188,7 +221,12 @@ class DexcomApiClient:
                     except ValueError:
                         logger.warning(
                             "Invalid Retry-After header. Using exponential backoff.",
-                            extra={"retry_after": retry_after_header, "delay": delay}
+                            extra={
+                                "log_type": "retry",
+                                "correlation_id": correlation_id,
+                                "retry_after": retry_after_header,
+                                "delay": delay
+                            }
                         )
 
             # Add jitter to avoid thundering herd
@@ -197,6 +235,8 @@ class DexcomApiClient:
             logger.debug(
                 "Retrying after delay.",
                 extra={
+                    "log_type": "retry",
+                    "correlation_id": correlation_id,
                     "attempt": attempt,
                     "max_retries": self.max_retries + 1,
                     "actual_delay": actual_delay
@@ -214,7 +254,7 @@ class DexcomApiClient:
         await self.circuit_breaker.before_request()
         try:
             async with self.rate_limiter:
-                await self._ensure_token_valid()
+                await self._ensure_token_valid(correlation_id)
                 url = f"{self.base_url}{endpoint}"
                 headers = {"Authorization": f"Bearer {self._access_token}"}
                 logger.info(
@@ -303,7 +343,7 @@ class DexcomApiClient:
         await self.circuit_breaker.before_request()
         try:
             async with self.rate_limiter:
-                await self._ensure_token_valid()
+                await self._ensure_token_valid(correlation_id)
                 url = f"{self.base_url}{endpoint}"
                 headers = {"Authorization": f"Bearer {self._access_token}"}
                 logger.info(
