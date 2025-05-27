@@ -12,6 +12,7 @@ import random
 from typing import Optional, Type, TypeVar, List
 import logging
 from src.auth.circuit_breaker import CircuitBreakerOpenError
+import json
 
 @pytest.mark.asyncio
 async def test_get_authorization_url():
@@ -453,3 +454,107 @@ async def test_client_circuit_breaker_recovers_after_timeout(monkeypatch):
     assert response.status_code == 200
     # Circuit should be closed again
     assert client.circuit_breaker.state == client.circuit_breaker.STATE_CLOSED
+
+def test_logging_json_format_and_fields(caplog):
+    """
+    Test that DexcomApiClient logs are output in structured JSON format and contain required fields.
+    """
+    from src.auth.dexcom_client import logger
+    from src.utils.config import JSONFormatter
+    import logging
+    import sys
+    import io
+    
+    # Use a StringIO object to capture the log output directly
+    string_io = io.StringIO()
+    handler = logging.StreamHandler(string_io)
+    handler.setFormatter(JSONFormatter())
+    
+    # Save original handlers and propagate settings
+    original_handlers = logger.handlers.copy()
+    original_propagate = logger.propagate
+    
+    # Configure our test handler
+    logger.handlers = [handler]
+    logger.propagate = False
+    
+    try:
+        # Log a test message
+        logger.info("Test log message", extra={"foo": "bar"})
+        
+        # Get the logged content
+        log_content = string_io.getvalue().strip()
+        
+        # Verify it's valid JSON and contains expected fields
+        log_json = json.loads(log_content)
+        assert log_json["level"] == "INFO"
+        assert log_json["message"] == "Test log message"
+        assert log_json["foo"] == "bar"
+        assert "timestamp" in log_json
+        assert "module" in log_json
+        assert "function" in log_json
+        assert "line" in log_json
+    finally:
+        # Restore logger to original state
+        logger.handlers = original_handlers
+        logger.propagate = original_propagate
+
+def test_logging_level_filtering(caplog):
+    """
+    Test that log level filtering works as expected for DexcomApiClient logs.
+    """
+    from src.auth.dexcom_client import logger
+    from src.utils.config import JSONFormatter
+    import logging
+    import io
+    
+    # Create two StringIO objects to capture different log levels
+    info_io = io.StringIO()
+    warning_io = io.StringIO()
+    
+    # Save original handlers and propagate settings
+    original_handlers = logger.handlers.copy()
+    original_propagate = logger.propagate
+    original_level = logger.level
+    
+    try:
+        # Set up INFO handler
+        info_handler = logging.StreamHandler(info_io)
+        info_handler.setFormatter(JSONFormatter())
+        info_handler.setLevel(logging.INFO)
+        
+        # Set up WARNING handler
+        warning_handler = logging.StreamHandler(warning_io)
+        warning_handler.setFormatter(JSONFormatter())
+        warning_handler.setLevel(logging.WARNING)
+        
+        # Configure our test handlers
+        logger.handlers = [info_handler, warning_handler]
+        logger.setLevel(logging.INFO)  # Enable INFO level logging
+        logger.propagate = False
+        
+        # Log test messages
+        logger.info("This should not appear in WARNING")
+        logger.warning("This should appear", extra={"test": True})
+        
+        # Check that INFO captures both messages
+        info_content = info_io.getvalue()
+        assert "This should not appear in WARNING" in info_content
+        assert "This should appear" in info_content
+        
+        # Check that WARNING only captures warning message
+        warning_content = warning_io.getvalue()
+        assert "This should not appear in WARNING" not in warning_content
+        assert "This should appear" in warning_content
+        
+        # Verify JSON format of warning message
+        warning_log = warning_content.strip().split('\n')[-1]  # Get last line
+        log_json = json.loads(warning_log)
+        assert log_json["level"] == "WARNING"
+        assert log_json["message"] == "This should appear"
+        assert log_json["test"] is True
+    finally:
+        # Restore logger to original state
+        logger.handlers = original_handlers
+        logger.propagate = original_propagate
+        logger.setLevel(original_level)

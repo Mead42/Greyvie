@@ -9,6 +9,9 @@ import boto3
 from botocore.exceptions import ClientError
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import logging
+import sys
+from datetime import datetime
 
 
 class AwsSecretsManager:
@@ -202,3 +205,49 @@ def get_settings() -> Settings:
         Settings: Application settings
     """
     return Settings() 
+
+
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_record = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "level": record.levelname,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno
+        }
+        if record.exc_info:
+            log_record["exception"] = self.formatException(record.exc_info)
+        
+        # Add extra fields from record
+        # Standard fields to exclude when looking for extra fields
+        standard_fields = {
+            'name', 'msg', 'args', 'created', 'msecs', 'levelname', 'levelno', 
+            'pathname', 'filename', 'module', 'exc_info', 'exc_text', 'stack_info',
+            'lineno', 'funcName', 'relativeCreated', 'thread', 'threadName',
+            'processName', 'process', 'getMessage', 'message'
+        }
+        
+        # Add any extra fields that were passed to the logger
+        for key, value in record.__dict__.items():
+            if key not in standard_fields and not key.startswith('_'):
+                log_record[key] = value
+                
+        return json.dumps(log_record)
+
+def setup_logging(level: str = "INFO"):
+    """
+    Set up structured JSON logging for the service.
+    Args:
+        level: Logging level as a string (e.g., 'INFO', 'DEBUG')
+    """
+    logger = logging.getLogger()
+    logger.setLevel(level.upper())
+    # Remove all handlers associated with the root logger object (avoid duplicate logs)
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(JSONFormatter())
+    logger.addHandler(handler)
+    return logger 
