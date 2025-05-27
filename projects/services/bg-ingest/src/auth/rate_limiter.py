@@ -67,8 +67,16 @@ class AsyncRateLimiter:
 
     def close(self):
         self._closed = True
-        if self._refill_task:
-            self._refill_task.cancel()
+        if self._refill_task and not self._refill_task.done():
+            try:
+                self._refill_task.cancel()
+            except RuntimeError:
+                # Event loop might be closed, just ignore
+                pass
 
     def __del__(self):
-        self.close() 
+        try:
+            self.close()
+        except Exception:
+            # Never raise exceptions from __del__
+            pass

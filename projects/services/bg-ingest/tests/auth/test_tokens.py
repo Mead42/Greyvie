@@ -15,7 +15,7 @@ from src.auth.tokens import (
     get_tokens_needing_refresh,
     exchange_code_and_store,
 )
-from src.models.tokens import UserToken, TokenProvider
+from src.models.tokens import UserToken, TokenProvider, TokenType
 
 
 @pytest.fixture
@@ -73,38 +73,53 @@ def mock_refresh_access_token():
 
 
 def create_mock_token(user_id, provider_value, access_token_value, refresh_token_value=None, expired=False):
-    """Helper to create a properly mocked UserToken."""
-    mock_token = mock.MagicMock()
-    mock_token.user_id = user_id
-    
-    # Set up the provider properly
-    mock_token.provider = TokenProvider.DEXCOM if provider_value == "dexcom" else TokenProvider.INTERNAL
-    
-    # Create nested mocks for the SecretStr attributes
-    mock_access_token = mock.MagicMock(spec=SecretStr)
-    mock_access_token.get_secret_value.return_value = access_token_value
-    mock_token.access_token = mock_access_token
-    
-    if refresh_token_value:
-        mock_refresh_token = mock.MagicMock(spec=SecretStr)
-        mock_refresh_token.get_secret_value.return_value = refresh_token_value
-        mock_token.refresh_token = mock_refresh_token
-    else:
-        mock_token.refresh_token = None
-    
-    # Set expiration
+    """Helper to create a UserToken instance for testing."""
+    # For expired tokens, we need to use mocks since Pydantic validation won't allow expired dates
     if expired:
+        mock_token = mock.MagicMock()
+        mock_token.user_id = user_id
+        mock_token.provider = TokenProvider.DEXCOM if provider_value == "dexcom" else TokenProvider.INTERNAL
+        
+        # Create nested mocks for the SecretStr attributes
+        mock_access_token = mock.MagicMock(spec=SecretStr)
+        mock_access_token.get_secret_value.return_value = access_token_value
+        mock_token.access_token = mock_access_token
+        
+        if refresh_token_value:
+            mock_refresh_token = mock.MagicMock(spec=SecretStr)
+            mock_refresh_token.get_secret_value.return_value = refresh_token_value
+            mock_token.refresh_token = mock_refresh_token
+        else:
+            mock_token.refresh_token = None
+        
+        # Set expiration in the past
         mock_token.expires_at = datetime.utcnow() - timedelta(minutes=5)
-        mock_token.is_expired.return_value = True
+        mock_token.is_expired = mock.MagicMock(return_value=True)
+        
+        mock_token.scope = "offline_access"
+        mock_token.created_at = datetime.utcnow() - timedelta(days=1)
+        mock_token.updated_at = datetime.utcnow()
+        mock_token.token_type = TokenType.OAUTH
+        
+        return mock_token
     else:
-        mock_token.expires_at = datetime.utcnow() + timedelta(hours=1)
-        mock_token.is_expired.return_value = False
-    
-    mock_token.scope = "offline_access"
-    mock_token.created_at = datetime.utcnow() - timedelta(days=1)
-    mock_token.updated_at = datetime.utcnow()
-    
-    return mock_token
+        # For non-expired tokens, create an actual UserToken instance
+        expires_at = datetime.utcnow() + timedelta(hours=1)
+        
+        # Create a real UserToken instance with valid values
+        token = UserToken(
+            user_id=user_id,
+            provider=TokenProvider.DEXCOM if provider_value == "dexcom" else TokenProvider.INTERNAL,
+            access_token=SecretStr(access_token_value),
+            refresh_token=SecretStr(refresh_token_value) if refresh_token_value else None,
+            token_type=TokenType.OAUTH,  # Use enum value instead of "Bearer"
+            expires_at=expires_at,
+            scope="offline_access",
+            created_at=datetime.utcnow() - timedelta(days=1),
+            updated_at=datetime.utcnow()
+        )
+        
+        return token
 
 
 class TestTokenService:
@@ -269,7 +284,7 @@ class TestTokenService:
         user_id = "test_user"
         provider = TokenProvider.DEXCOM
         
-        # Create a properly mocked token with a refresh token
+        # Create a token with a refresh token
         token = create_mock_token(
             user_id=user_id,
             provider_value="dexcom",

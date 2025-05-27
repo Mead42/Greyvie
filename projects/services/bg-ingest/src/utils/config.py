@@ -160,7 +160,7 @@ class Settings(BaseSettings):
                 key_lower = key.lower()
                 if hasattr(self, key_lower):
                     # Check if the field is a SecretStr type and wrap the value
-                    field_info = self.__class__.model_fields.get(key_lower)
+                    field_info = Settings.model_fields.get(key_lower)
                     if field_info and field_info.annotation == SecretStr and isinstance(value, str):
                         value = SecretStr(value)
                     setattr(self, key_lower, value)

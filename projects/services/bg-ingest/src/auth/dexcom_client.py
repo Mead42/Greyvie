@@ -259,7 +259,7 @@ class DexcomApiClient:
             data = response.json()
             # If a model is provided, use it
             if model:
-                return model.parse_obj(data)
+                return model.model_validate(data)
             # Default: handle /egvs endpoint (list of readings)
             if "egvs" in data:
                 return [GlucoseReading(**item) for item in data["egvs"]]
