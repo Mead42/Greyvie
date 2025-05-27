@@ -99,6 +99,10 @@ class Settings(BaseSettings):
     retry_backoff_factor: int = Field(2, description="Backoff factor for retries")
     request_timeout_seconds: int = Field(30, description="HTTP request timeout in seconds")
 
+    # Metrics Basic Auth
+    metrics_user: Optional[str] = Field(None, description="Username for /metrics basic auth", alias="METRICS_USER")
+    metrics_pass: Optional[SecretStr] = Field(None, description="Password for /metrics basic auth", alias="METRICS_PASS")
+
     # CORS Validation
     @field_validator("cors_origins")
     @classmethod

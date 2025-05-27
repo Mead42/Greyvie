@@ -4,10 +4,13 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any, Dict
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from starlette.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, make_asgi_app
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from starlette.status import HTTP_401_UNAUTHORIZED
+import base64
 
 from src.utils.config import Settings, get_settings, setup_logging
 from src.data.dynamodb import get_dynamodb_client
@@ -26,6 +29,8 @@ except (ValueError, TypeError, AttributeError):
     # Default to INFO if there's any error with the log level
     setup_logging("INFO")
 logger = logging.getLogger(__name__)
+
+security = HTTPBasic()
 
 
 @asynccontextmanager
@@ -58,6 +63,44 @@ async def lifespan(app: FastAPI) -> Any:
     
     # Shutdown logic
     logger.info("Shutting down BG Ingest Service...")
+
+
+class MetricsAuthMiddleware:
+    def __init__(self, app, username, password):
+        self.app = app
+        self.username = username
+        self.password = password
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            headers = dict(scope.get("headers") or [])
+            auth_header = headers.get(b"authorization")
+            if not auth_header or not auth_header.startswith(b"Basic "):
+                response = Response(
+                    status_code=HTTP_401_UNAUTHORIZED,
+                    headers={"WWW-Authenticate": "Basic"},
+                )
+                await response(scope, receive, send)
+                return
+            try:
+                encoded = auth_header.split(b" ", 1)[1]
+                decoded = base64.b64decode(encoded).decode()
+                username, password = decoded.split(":", 1)
+            except Exception:
+                response = Response(
+                    status_code=HTTP_401_UNAUTHORIZED,
+                    headers={"WWW-Authenticate": "Basic"},
+                )
+                await response(scope, receive, send)
+                return
+            if username != self.username or password != self.password:
+                response = Response(
+                    status_code=HTTP_401_UNAUTHORIZED,
+                    headers={"WWW-Authenticate": "Basic"},
+                )
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
 
 
 def create_app() -> FastAPI:
@@ -109,15 +152,15 @@ def create_app() -> FastAPI:
         """
         return {"status": "healthy", "service": "bg-ingest"}
     
-    @app.get("/metrics")
-    async def metrics():
-        """
-        Prometheus metrics endpoint.
-        Returns:
-            Response: Prometheus metrics in text format
-        """
-        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
-    
+    # Mount the Prometheus metrics endpoint with auth middleware
+    metrics_user = settings.metrics_user
+    metrics_pass = settings.metrics_pass.get_secret_value() if hasattr(settings.metrics_pass, 'get_secret_value') else settings.metrics_pass
+    metrics_app = make_asgi_app()
+    app.mount(
+        "/metrics",
+        MetricsAuthMiddleware(metrics_app, metrics_user, metrics_pass)
+    )
+
     return app
 
 
