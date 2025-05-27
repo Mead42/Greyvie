@@ -110,49 +110,83 @@
 7. Security testing for common vulnerabilities
 
 # Subtasks:
-## 1. Implement JWT Validation [done]
+## 1. Implement Password Hashing with Argon2 [done]
 ### Dependencies: None
-### Description: Set up JSON Web Token validation for secure authentication and authorization
+### Description: Set up a secure password hashing system using Argon2 for user credentials
 ### Details:
-Implement JWT validation including: token signature verification, expiration checking, issuer validation, and proper audience validation. Create middleware to validate tokens on protected routes. Include refresh token rotation strategy. Write test cases for valid tokens, expired tokens, tampered tokens, and proper authorization checks.
+1. Install Argon2 library for your platform
+2. Configure appropriate memory, iterations, and parallelism parameters
+3. Create a password hashing service/utility
+4. Implement functions for hashing new passwords
+5. Add unit tests to verify hashing functionality
+6. Document the implementation with security rationale
 
-## 2. Implement Rate Limiting [done]
+## 2. Implement Secure Storage for API Keys and Secrets [pending]
 ### Dependencies: None
-### Description: Add rate limiting to protect against brute force and DoS attacks
+### Description: Create a system for securely storing and accessing API keys and other secrets
 ### Details:
-Implement IP-based and user-based rate limiting for sensitive endpoints. Configure appropriate limits for login attempts, API requests, and resource-intensive operations. Use token bucket or sliding window algorithm. Include graceful handling of rate limit errors with appropriate HTTP 429 responses. Create tests for rate limit triggering and reset behavior.
-<info added on 2025-05-27T04:28:49.068Z>
-Rate limiting implementation has been successfully completed with the following enhancements:
+1. Set up environment variable management for development and production
+2. Integrate with a secrets manager (AWS Secrets Manager, HashiCorp Vault, etc.)
+3. Create an abstraction layer for accessing secrets
+4. Implement caching strategy to minimize API calls to secrets manager
+5. Set up proper IAM/access controls for the secrets manager
+6. Document the secrets management workflow for developers
 
-- Enhanced RateLimiter to support both user-based and IP-based rate limiting
-- Added per-endpoint configuration with pattern matching for flexible rate limit rules
-- Fixed token bucket algorithm to properly track and enforce limits
-- Added comprehensive tests covering all rate limiting scenarios
-- Resolved middleware order issues (JWT validation now executes before RateLimiter)
-- All 141 tests are now passing
-</info added on 2025-05-27T04:28:49.068Z>
-
-## 3. Implement Secure Credential Storage [pending]
-### Dependencies: None
-### Description: Set up secure storage for user credentials and sensitive information
+## 3. Implement Database Encryption for Sensitive Fields [done]
+### Dependencies: 14.2
+### Description: Set up field-level encryption for sensitive data stored in the database
 ### Details:
-Implement password hashing using bcrypt or Argon2 with appropriate work factors. Set up secure storage for API keys and secrets using environment variables or a secrets manager. Ensure database encryption for sensitive fields. Create a key rotation strategy. Test password verification, failed attempts handling, and ensure no plaintext credentials in logs or error messages.
+1. Identify all sensitive fields requiring encryption
+2. Set up encryption key management
+3. Implement transparent data encryption at the database level if supported
+4. Create data access layer that handles encryption/decryption
+5. Update database schema and models to support encrypted fields
+6. Add unit tests for encryption/decryption operations
+7. Document the encryption strategy
+<info added on 2025-05-27T15:20:00.002Z>
+Implementation Plan for Password Hashing with Argon2:
 
-## 4. Implement Input Validation [pending]
-### Dependencies: 14.1, 14.3
-### Description: Add comprehensive input validation to prevent injection attacks
-### Details:
-Implement server-side validation for all user inputs using a validation library. Create schema validation for API requests. Add sanitization for inputs that will be displayed or stored. Protect against SQL injection, XSS, and CSRF attacks. Test with malicious inputs including SQL injection payloads, script tags, and oversized payloads.
+1. Install the Argon2 library (argon2-cffi for Python).
+2. Configure secure parameters: time_cost=3, memory_cost=65536, parallelism=2.
+3. Create a password hashing utility class with methods for hashing and verifying passwords.
+4. Integrate the utility with user registration (hash before storing) and login (verify input password).
+5. Add unit tests for correct/incorrect/edge-case passwords.
+6. Document the implementation and security rationale.
+7. Ensure no plaintext passwords or hashes are logged or exposed.
+</info added on 2025-05-27T15:20:00.002Z>
 
-## 5. Implement Audit Logging [pending]
-### Dependencies: 14.1, 14.2
-### Description: Set up comprehensive security audit logging system
+## 4. Develop Key Rotation Strategy [pending]
+### Dependencies: 14.2, 14.3
+### Description: Create a system for regular rotation of encryption keys and credentials
 ### Details:
-Implement detailed audit logging for authentication events, authorization failures, and sensitive operations. Include timestamp, user ID, IP address, action type, and result in logs. Ensure logs are tamper-evident and stored securely. Implement log rotation and retention policies. Test log generation for various security events and verify log integrity.
+1. Design key versioning system
+2. Implement automated key rotation schedule
+3. Create procedures for emergency key rotation
+4. Develop migration strategy for re-encrypting data with new keys
+5. Set up monitoring and alerts for key expiration
+6. Document the key rotation process and recovery procedures
 
-## 6. Implement CORS Protection [pending]
-### Dependencies: 14.1, 14.4
-### Description: Configure Cross-Origin Resource Sharing (CORS) policies
+## 5. Implement Password Verification and Failed Attempt Handling [pending]
+### Dependencies: 14.1
+### Description: Create secure password verification with protection against brute force attacks
 ### Details:
-Implement strict CORS policies allowing only trusted origins. Configure appropriate headers including Access-Control-Allow-Origin, Access-Control-Allow-Methods, and Access-Control-Allow-Headers. Implement preflight request handling. Ensure credentials mode is properly configured. Test with requests from allowed and disallowed origins, and verify preflight handling.
+1. Implement constant-time password verification
+2. Create account lockout mechanism after failed attempts
+3. Add progressive delays between login attempts
+4. Implement notification system for suspicious login activities
+5. Create password reset functionality with secure tokens
+6. Add logging for authentication events
+7. Test the system against timing attacks
+
+## 6. Ensure No Plaintext Credentials in Logs or Errors [pending]
+### Dependencies: 14.1, 14.2, 14.5
+### Description: Implement safeguards to prevent credentials from appearing in logs, error messages, or responses
+### Details:
+1. Create custom error handlers that sanitize sensitive data
+2. Implement request/response middleware to filter credentials
+3. Configure logging frameworks to redact sensitive information
+4. Add data loss prevention checks in CI/CD pipeline
+5. Create automated tests to verify no credentials are leaked
+6. Review and update error messages across the application
+7. Document best practices for error handling
 
