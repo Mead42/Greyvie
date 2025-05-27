@@ -291,7 +291,7 @@
           "title": "Structured Logging Foundation",
           "description": "Establish a consistent, structured logging setup for the Dexcom API client. Integrate Python’s logging module (or structlog), define log format (JSON or key-value), set up log levels, ensure logs include timestamp, log level, module, and message. Add unit tests to verify log output format and level filtering.",
           "details": "- Integrate Python’s logging module (or structlog for richer structure)\n- Define log format (JSON or key-value pairs) for easy parsing\n- Set up log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL) and allow configuration via environment or client options\n- Ensure all logs include timestamp, log level, module, and message\n- Add unit tests to verify log output format and level filtering",
-          "status": "in-progress",
+          "status": "done",
           "dependencies": [
             1,
             2,
@@ -305,7 +305,7 @@
           "title": "Request/Response Logging with PII Redaction",
           "description": "Log all API requests and responses, ensuring no sensitive data (PII) is exposed. Implement middleware or wrapper to log outgoing requests and incoming responses, redact PII fields, and log request method, URL, status code, latency, and response size. Add tests to verify PII is never logged and logs contain required metadata.",
           "details": "- Implement middleware or wrapper in the client to log outgoing requests and incoming responses\n- Identify and redact PII fields (e.g., tokens, user IDs, glucose values if required)\n- Log request method, URL, status code, latency, and response size\n- Add tests to verify PII is never logged and that logs contain required metadata",
-          "status": "pending",
+          "status": "done",
           "dependencies": [
             1,
             2,
@@ -319,7 +319,7 @@
           "title": "Correlation IDs and Request Tracing",
           "description": "Enable tracing of requests across logs for debugging and monitoring. Generate a unique correlation/request ID for each API call, propagate through all logs, and allow passing a correlation ID from upstream. Add tests to ensure correlation IDs are present and consistent in logs.",
           "details": "- Generate a unique correlation/request ID for each API call (UUID4)\n- Propagate correlation ID through all logs related to a single request\n- Optionally, allow passing a correlation ID from upstream (for integration with larger systems)\n- Add tests to ensure correlation IDs are present and consistent in logs",
-          "status": "pending",
+          "status": "in-progress",
           "dependencies": [
             1,
             2,

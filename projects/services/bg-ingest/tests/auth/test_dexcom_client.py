@@ -13,6 +13,19 @@ from typing import Optional, Type, TypeVar, List
 import logging
 from src.auth.circuit_breaker import CircuitBreakerOpenError
 import json
+import uuid
+import io
+
+# --- Mock methods for PII redaction test (defined at module level) ---
+async def mock_ensure_token_valid(self):
+    return None
+
+async def mock_cb_before_request(self): # Renamed to avoid conflict if used elsewhere
+    return None
+
+async def mock_cb_record_success(self): # Renamed to avoid conflict
+    return None
+# --- End mock methods ---
 
 @pytest.mark.asyncio
 async def test_get_authorization_url():
@@ -140,6 +153,8 @@ async def test_get_success(monkeypatch):
     client = make_client_with_token()
     mock_response = AsyncMock()
     mock_response.status_code = 200
+    mock_response.headers = {}
+    mock_response.content = b"{}"
     monkeypatch.setattr(client._client, "get", AsyncMock(return_value=mock_response))
     response = await client.get("/v2/users/self/egvs", params={"foo": "bar"})
     assert response.status_code == 200
@@ -149,6 +164,8 @@ async def test_post_success(monkeypatch):
     client = make_client_with_token()
     mock_response = AsyncMock()
     mock_response.status_code = 200
+    mock_response.headers = {}
+    mock_response.content = b"{}"
     monkeypatch.setattr(client._client, "post", AsyncMock(return_value=mock_response))
     response = await client.post("/v2/users/self/egvs", data={"foo": "bar"})
     assert response.status_code == 200
@@ -162,6 +179,8 @@ async def test_get_expired_token_refresh(monkeypatch):
     monkeypatch.setattr(client, "refresh_access_token", mock_refresh)
     mock_response = AsyncMock()
     mock_response.status_code = 200
+    mock_response.headers = {}
+    mock_response.content = b"{}"
     monkeypatch.setattr(client._client, "get", AsyncMock(return_value=mock_response))
     response = await client.get("/v2/users/self/egvs")
     assert response.status_code == 200
@@ -176,6 +195,8 @@ async def test_post_expired_token_refresh(monkeypatch):
     monkeypatch.setattr(client, "refresh_access_token", mock_refresh)
     mock_response = AsyncMock()
     mock_response.status_code = 200
+    mock_response.headers = {}
+    mock_response.content = b"{}"
     monkeypatch.setattr(client._client, "post", AsyncMock(return_value=mock_response))
     response = await client.post("/v2/users/self/egvs", data={})
     assert response.status_code == 200
@@ -185,7 +206,10 @@ async def test_post_expired_token_refresh(monkeypatch):
 async def test_get_401_refresh_and_retry_success(monkeypatch):
     client = make_client_with_token()
     # First call returns 401, second returns 200
-    mock_get = AsyncMock(side_effect=[AsyncMock(status_code=401), AsyncMock(status_code=200)])
+    mock_get = AsyncMock(side_effect=[
+        AsyncMock(status_code=401, headers={}, content=b"auth error"), 
+        AsyncMock(status_code=200, headers={}, content=b"success")
+    ])
     monkeypatch.setattr(client._client, "get", mock_get)
     mock_refresh = AsyncMock()
     monkeypatch.setattr(client, "refresh_access_token", mock_refresh)
@@ -198,7 +222,10 @@ async def test_get_401_refresh_and_retry_success(monkeypatch):
 async def test_post_401_refresh_and_retry_success(monkeypatch):
     client = make_client_with_token()
     # First call returns 401, second returns 200
-    mock_post = AsyncMock(side_effect=[AsyncMock(status_code=401), AsyncMock(status_code=200)])
+    mock_post = AsyncMock(side_effect=[
+        AsyncMock(status_code=401, headers={}, content=b"auth error"), 
+        AsyncMock(status_code=200, headers={}, content=b"success")
+    ])
     monkeypatch.setattr(client._client, "post", mock_post)
     mock_refresh = AsyncMock()
     monkeypatch.setattr(client, "refresh_access_token", mock_refresh)
@@ -211,7 +238,10 @@ async def test_post_401_refresh_and_retry_success(monkeypatch):
 async def test_get_401_refresh_and_retry_fail(monkeypatch):
     client = make_client_with_token()
     # Both calls return 401
-    mock_get = AsyncMock(side_effect=[AsyncMock(status_code=401), AsyncMock(status_code=401)])
+    mock_get = AsyncMock(side_effect=[
+        AsyncMock(status_code=401, headers={}, text="auth error1", request=httpx.Request("GET", "url"), content=b"auth error1"), 
+        AsyncMock(status_code=401, headers={}, text="auth error2", request=httpx.Request("GET", "url"), content=b"auth error2")
+    ])
     monkeypatch.setattr(client._client, "get", mock_get)
     mock_refresh = AsyncMock()
     monkeypatch.setattr(client, "refresh_access_token", mock_refresh)
@@ -224,7 +254,10 @@ async def test_get_401_refresh_and_retry_fail(monkeypatch):
 async def test_post_401_refresh_and_retry_fail(monkeypatch):
     client = make_client_with_token()
     # Both calls return 401
-    mock_post = AsyncMock(side_effect=[AsyncMock(status_code=401), AsyncMock(status_code=401)])
+    mock_post = AsyncMock(side_effect=[
+        AsyncMock(status_code=401, headers={}, text="auth error1", request=httpx.Request("POST", "url"), content=b"auth error1"), 
+        AsyncMock(status_code=401, headers={}, text="auth error2", request=httpx.Request("POST", "url"), content=b"auth error2")
+    ])
     monkeypatch.setattr(client._client, "post", mock_post)
     mock_refresh = AsyncMock()
     monkeypatch.setattr(client, "refresh_access_token", mock_refresh)
@@ -426,8 +459,8 @@ async def test_client_circuit_breaker_recovers_after_timeout(monkeypatch):
 
     # Always return 500 first, then 200
     mock_get = AsyncMock(side_effect=[
-        AsyncMock(status_code=500, text="fail", request=httpx.Request("GET", "url")),
-        AsyncMock(status_code=200, request=httpx.Request("GET", "url"))
+        AsyncMock(status_code=500, text="fail", request=httpx.Request("GET", "url"), headers={}, content=b"fail content"),
+        AsyncMock(status_code=200, request=httpx.Request("GET", "url"), headers={}, content=b"success content")
     ])
     monkeypatch.setattr(client._client, "get", mock_get)
 
@@ -454,6 +487,89 @@ async def test_client_circuit_breaker_recovers_after_timeout(monkeypatch):
     assert response.status_code == 200
     # Circuit should be closed again
     assert client.circuit_breaker.state == client.circuit_breaker.STATE_CLOSED
+
+@pytest.mark.asyncio
+async def test_request_response_logging_and_pii_redaction(monkeypatch):
+    """
+    Test that DexcomApiClient logs requests and responses with PII redacted and correlation_id present.
+    """
+    from src.auth.dexcom_client import DexcomApiClient, logger, PII_FIELDS
+    from src.auth.circuit_breaker import CircuitBreaker
+    from src.utils.config import JSONFormatter
+    
+    # Patch methods on the CircuitBreaker class
+    monkeypatch.setattr(CircuitBreaker, "before_request", mock_cb_before_request)
+    monkeypatch.setattr(CircuitBreaker, "record_success", mock_cb_record_success)
+    
+    # Prepare a fake response
+    class DummyResponse:
+        status_code = 200
+        headers = {"X-Test": "value"}
+        content = b'{"access_token": "secret", "foo": "bar"}'
+        async def json(self):
+            return {"access_token": "secret", "foo": "bar"}
+    
+    # Patch the _client.get and _client.post to return DummyResponse
+    async def fake_get(*args, **kwargs):
+        return DummyResponse()
+    async def fake_post(*args, **kwargs):
+        return DummyResponse()
+    
+    # Patch _ensure_token_valid on the DexcomApiClient class for this test
+    # This is specific to DexcomApiClient, not CircuitBreaker
+    monkeypatch.setattr(DexcomApiClient, "_ensure_token_valid", mock_ensure_token_valid)
+
+    # Set up log capture
+    string_io = io.StringIO()
+    handler = logging.StreamHandler(string_io)
+    handler.setFormatter(JSONFormatter())
+    original_handlers = logger.handlers.copy()
+    original_propagate = logger.propagate
+    logger.handlers = [handler]
+    logger.propagate = False
+    
+    try:
+        client = DexcomApiClient(
+            base_url="https://sandbox-api.dexcom.com",
+            client_id="test_id",
+            client_secret="test_secret",
+            sandbox=True
+        )
+        monkeypatch.setattr(client._client, "get", fake_get)
+        monkeypatch.setattr(client._client, "post", fake_post)
+        
+        # Use a fixed correlation_id for test
+        correlation_id = str(uuid.uuid4())
+        # Call GET
+        await client.get("/v2/users/self/egvs", params={"user_id": "should_redact", "foo": "bar"}, correlation_id=correlation_id)
+        # Call POST
+        await client.post("/v2/users/self/egvs", data={"access_token": "should_redact", "foo": "bar"}, correlation_id=correlation_id)
+        
+        # Get all log lines
+        log_lines = [line for line in string_io.getvalue().splitlines() if line.strip()]
+        # There should be 4 logs: request/response for GET and POST
+        assert len(log_lines) == 4
+        for log_line in log_lines:
+            log_json = json.loads(log_line)
+            # Correlation ID should be present and match
+            assert log_json["correlation_id"] == correlation_id
+            # PII fields should be redacted in params/body/headers
+            for pii in PII_FIELDS:
+                if "params" in log_json and log_json["params"]:
+                    assert log_json["params"].get(pii) != "should_redact"
+                    if pii in log_json["params"]:
+                        assert log_json["params"][pii] == "***REDACTED***"
+                if "body" in log_json and log_json["body"]:
+                    assert log_json["body"].get(pii) != "should_redact"
+                    if pii in log_json["body"]:
+                        assert log_json["body"][pii] == "***REDACTED***"
+                if "headers" in log_json and log_json["headers"]:
+                    assert log_json["headers"].get(pii) != "should_redact"
+                    if pii in log_json["headers"]:
+                        assert log_json["headers"][pii] == "***REDACTED***"
+    finally:
+        logger.handlers = original_handlers
+        logger.propagate = original_propagate
 
 def test_logging_json_format_and_fields(caplog):
     """

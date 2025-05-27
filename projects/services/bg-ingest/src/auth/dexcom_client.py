@@ -8,12 +8,22 @@ from src.auth.circuit_breaker import CircuitBreaker, CircuitBreakerOpenError
 import asyncio
 import logging
 from src.utils.config import get_settings, setup_logging
+import uuid
 
 T = TypeVar('T')
 
 settings = get_settings()
 setup_logging(settings.log_level)
 logger = logging.getLogger(__name__)
+
+PII_FIELDS = {"access_token", "refresh_token", "user_id"}
+
+def redact_pii(data, pii_fields=PII_FIELDS):
+    if isinstance(data, dict):
+        return {k: ("***REDACTED***" if k in pii_fields else redact_pii(v, pii_fields)) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [redact_pii(item, pii_fields) for item in data]
+    return data
 
 class DexcomApiClient:
     """
@@ -194,17 +204,31 @@ class DexcomApiClient:
             )
             await asyncio.sleep(actual_delay)
 
-    async def get(self, endpoint: str, params: dict = None):
+    async def get(self, endpoint: str, params: dict = None, correlation_id: str = None):
         """
         Perform an authenticated GET request to the Dexcom API.
         Rate limited, circuit breaker protected, and retried on transient errors.
+        Logs outgoing requests and incoming responses with PII redacted. Supports correlation IDs for tracing.
         """
+        correlation_id = correlation_id or str(uuid.uuid4())
         await self.circuit_breaker.before_request()
         try:
             async with self.rate_limiter:
                 await self._ensure_token_valid()
                 url = f"{self.base_url}{endpoint}"
                 headers = {"Authorization": f"Bearer {self._access_token}"}
+                logger.info(
+                    "Dexcom API request",
+                    extra={
+                        "log_type": "request",
+                        "correlation_id": correlation_id,
+                        "method": "GET",
+                        "url": url,
+                        "headers": redact_pii(headers),
+                        "params": redact_pii(params) if params else None,
+                    }
+                )
+                start_time = datetime.utcnow()
                 async def do_get():
                     response = await self._client.get(url, params=params, headers=headers)
                     if response.status_code == 401:
@@ -214,7 +238,43 @@ class DexcomApiClient:
                     if response.status_code >= 400:
                         raise httpx.HTTPStatusError(f"Dexcom GET failed: {response.text}", request=response.request, response=response)
                     return response
-                result = await self._with_retries(do_get)
+                try:
+                    result = await self._with_retries(do_get)
+                except Exception as e:
+                    latency = (datetime.utcnow() - start_time).total_seconds()
+                    logger.error(
+                        "Dexcom API error",
+                        extra={
+                            "log_type": "error",
+                            "correlation_id": correlation_id,
+                            "method": "GET",
+                            "url": url,
+                            "headers": redact_pii(headers),
+                            "params": redact_pii(params) if params else None,
+                            "latency": latency,
+                            "error": str(e),
+                        }
+                    )
+                    raise
+                latency = (datetime.utcnow() - start_time).total_seconds()
+                try:
+                    response_json = await result.json()
+                except Exception:
+                    response_json = None
+                logger.info(
+                    "Dexcom API response",
+                    extra={
+                        "log_type": "response",
+                        "correlation_id": correlation_id,
+                        "method": "GET",
+                        "url": url,
+                        "status_code": result.status_code,
+                        "headers": redact_pii(dict(result.headers)),
+                        "body": redact_pii(response_json),
+                        "latency": latency,
+                        "response_size": len(result.content) if hasattr(result, 'content') else None,
+                    }
+                )
             await self.circuit_breaker.record_success()
             return result
         except (httpx.TransportError, httpx.TimeoutException, httpx.HTTPStatusError) as e:
@@ -233,17 +293,31 @@ class DexcomApiClient:
             )
             raise
 
-    async def post(self, endpoint: str, data: dict = None):
+    async def post(self, endpoint: str, data: dict = None, correlation_id: str = None):
         """
         Perform an authenticated POST request to the Dexcom API.
         Rate limited, circuit breaker protected, and retried on transient errors.
+        Logs outgoing requests and incoming responses with PII redacted. Supports correlation IDs for tracing.
         """
+        correlation_id = correlation_id or str(uuid.uuid4())
         await self.circuit_breaker.before_request()
         try:
             async with self.rate_limiter:
                 await self._ensure_token_valid()
                 url = f"{self.base_url}{endpoint}"
                 headers = {"Authorization": f"Bearer {self._access_token}"}
+                logger.info(
+                    "Dexcom API request",
+                    extra={
+                        "log_type": "request",
+                        "correlation_id": correlation_id,
+                        "method": "POST",
+                        "url": url,
+                        "headers": redact_pii(headers),
+                        "body": redact_pii(data) if data else None,
+                    }
+                )
+                start_time = datetime.utcnow()
                 async def do_post():
                     response = await self._client.post(url, data=data, headers=headers)
                     if response.status_code == 401:
@@ -253,7 +327,43 @@ class DexcomApiClient:
                     if response.status_code >= 400:
                         raise httpx.HTTPStatusError(f"Dexcom POST failed: {response.text}", request=response.request, response=response)
                     return response
-                result = await self._with_retries(do_post)
+                try:
+                    result = await self._with_retries(do_post)
+                except Exception as e:
+                    latency = (datetime.utcnow() - start_time).total_seconds()
+                    logger.error(
+                        "Dexcom API error",
+                        extra={
+                            "log_type": "error",
+                            "correlation_id": correlation_id,
+                            "method": "POST",
+                            "url": url,
+                            "headers": redact_pii(headers),
+                            "body": redact_pii(data) if data else None,
+                            "latency": latency,
+                            "error": str(e),
+                        }
+                    )
+                    raise
+                latency = (datetime.utcnow() - start_time).total_seconds()
+                try:
+                    response_json = await result.json()
+                except Exception:
+                    response_json = None
+                logger.info(
+                    "Dexcom API response",
+                    extra={
+                        "log_type": "response",
+                        "correlation_id": correlation_id,
+                        "method": "POST",
+                        "url": url,
+                        "status_code": result.status_code,
+                        "headers": redact_pii(dict(result.headers)),
+                        "body": redact_pii(response_json),
+                        "latency": latency,
+                        "response_size": len(result.content) if hasattr(result, 'content') else None,
+                    }
+                )
             await self.circuit_breaker.record_success()
             return result
         except (httpx.TransportError, httpx.TimeoutException, httpx.HTTPStatusError) as e:

@@ -83,7 +83,7 @@ Implement circuit breaker states (closed, open, half-open), configure failure th
 ### Details:
 Add structured logging for all API operations, implement request/response logging with PII redaction, create performance metrics collection (latency, error rates, etc.), add correlation IDs for request tracing, and implement configurable log levels. Test log output for different scenarios, verify PII redaction, and validate metrics collection.
 
-## 6. Structured Logging Foundation [in-progress]
+## 6. Structured Logging Foundation [done]
 ### Dependencies: 5.1, 5.2, 5.3, 5.4
 ### Description: Establish a consistent, structured logging setup for the Dexcom API client. Integrate Python’s logging module (or structlog), define log format (JSON or key-value), set up log levels, ensure logs include timestamp, log level, module, and message. Add unit tests to verify log output format and level filtering.
 ### Details:
@@ -93,7 +93,7 @@ Add structured logging for all API operations, implement request/response loggin
 - Ensure all logs include timestamp, log level, module, and message
 - Add unit tests to verify log output format and level filtering
 
-## 7. Request/Response Logging with PII Redaction [pending]
+## 7. Request/Response Logging with PII Redaction [done]
 ### Dependencies: 5.1, 5.2, 5.3, 5.4
 ### Description: Log all API requests and responses, ensuring no sensitive data (PII) is exposed. Implement middleware or wrapper to log outgoing requests and incoming responses, redact PII fields, and log request method, URL, status code, latency, and response size. Add tests to verify PII is never logged and logs contain required metadata.
 ### Details:
@@ -102,7 +102,7 @@ Add structured logging for all API operations, implement request/response loggin
 - Log request method, URL, status code, latency, and response size
 - Add tests to verify PII is never logged and that logs contain required metadata
 
-## 8. Correlation IDs and Request Tracing [pending]
+## 8. Correlation IDs and Request Tracing [in-progress]
 ### Dependencies: 5.1, 5.2, 5.3, 5.4
 ### Description: Enable tracing of requests across logs for debugging and monitoring. Generate a unique correlation/request ID for each API call, propagate through all logs, and allow passing a correlation ID from upstream. Add tests to ensure correlation IDs are present and consistent in logs.
 ### Details:
