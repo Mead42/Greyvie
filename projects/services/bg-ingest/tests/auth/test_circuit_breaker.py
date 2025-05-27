@@ -40,8 +40,8 @@ async def test_circuit_breaker_half_open_to_closed_on_success():
     cb = CircuitBreaker(failure_threshold=1, recovery_timeout=1, half_open_success_threshold=2, half_open_max_attempts=2)
     await cb.record_failure()  # Open
     # Simulate timeout
-    cb._state = cb.STATE_HALF_OPEN
-    cb._success_count = 0
+    cb.state = cb.STATE_HALF_OPEN
+    cb._half_open_successes = 0
     cb._half_open_attempts = 0
     await cb.before_request()  # 1st attempt
     await cb.record_success()
@@ -54,8 +54,8 @@ async def test_circuit_breaker_half_open_to_open_on_failure():
     cb = CircuitBreaker(failure_threshold=1, recovery_timeout=1, half_open_success_threshold=2, half_open_max_attempts=2)
     await cb.record_failure()  # Open
     # Simulate timeout
-    cb._state = cb.STATE_HALF_OPEN
-    cb._success_count = 0
+    cb.state = cb.STATE_HALF_OPEN
+    cb._half_open_successes = 0
     cb._half_open_attempts = 0
     await cb.before_request()  # 1st attempt
     await cb.record_failure()  # Should go back to open
@@ -66,8 +66,8 @@ async def test_circuit_breaker_half_open_max_attempts(monkeypatch):
     cb = CircuitBreaker(failure_threshold=1, recovery_timeout=1, half_open_success_threshold=2, half_open_max_attempts=1)
     await cb.record_failure()  # Open
     # Simulate timeout
-    cb._state = cb.STATE_HALF_OPEN
-    cb._success_count = 0
+    cb.state = cb.STATE_HALF_OPEN
+    cb._half_open_successes = 0
     cb._half_open_attempts = 1
     # Should revert to open after max attempts
     with pytest.raises(CircuitBreakerOpenError):

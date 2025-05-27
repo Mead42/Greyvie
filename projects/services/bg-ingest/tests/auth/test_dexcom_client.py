@@ -11,6 +11,7 @@ from src.auth.rate_limiter import AsyncRateLimiter
 import random
 from typing import Optional, Type, TypeVar, List
 import logging
+from src.auth.circuit_breaker import CircuitBreakerOpenError
 
 @pytest.mark.asyncio
 async def test_get_authorization_url():
@@ -376,3 +377,79 @@ def make_retry_client():
         max_retries=2,
         base_delay=0.01
     )
+
+@pytest.mark.asyncio
+async def test_client_circuit_breaker_opens_on_failures(monkeypatch):
+    client = DexcomApiClient(
+        base_url="https://sandbox-api.dexcom.com",
+        client_id="test_id",
+        client_secret="test_secret",
+        sandbox=True,
+        max_retries=0,
+        base_delay=0,
+        circuit_breaker_config={"failure_threshold": 2, "recovery_timeout": 10, "half_open_success_threshold": 1, "half_open_max_attempts": 1}
+    )
+    client._access_token = "access123"
+    client._token_expiry = datetime.utcnow() + timedelta(hours=1)
+
+    # Always return 500
+    mock_response = AsyncMock()
+    mock_response.status_code = 500
+    mock_response.text = "Internal Error"
+    mock_response.request = httpx.Request("GET", "url")
+    monkeypatch.setattr(client._client, "get", AsyncMock(return_value=mock_response))
+
+    # First call: should fail and increment failure count
+    with pytest.raises(httpx.HTTPStatusError):
+        await client.get("/v2/users/self/egvs")
+    # Second call: should open the circuit
+    with pytest.raises(httpx.HTTPStatusError):
+        await client.get("/v2/users/self/egvs")
+    # Third call: should be blocked by circuit breaker
+    with pytest.raises(CircuitBreakerOpenError):
+        await client.get("/v2/users/self/egvs")
+
+@pytest.mark.asyncio
+async def test_client_circuit_breaker_recovers_after_timeout(monkeypatch):
+    client = DexcomApiClient(
+        base_url="https://sandbox-api.dexcom.com",
+        client_id="test_id",
+        client_secret="test_secret",
+        sandbox=True,
+        max_retries=0,
+        base_delay=0,
+        circuit_breaker_config={"failure_threshold": 1, "recovery_timeout": 1, "half_open_success_threshold": 1, "half_open_max_attempts": 1}
+    )
+    client._access_token = "access123"
+    client._token_expiry = datetime.utcnow() + timedelta(hours=1)
+
+    # Always return 500 first, then 200
+    mock_get = AsyncMock(side_effect=[
+        AsyncMock(status_code=500, text="fail", request=httpx.Request("GET", "url")),
+        AsyncMock(status_code=200, request=httpx.Request("GET", "url"))
+    ])
+    monkeypatch.setattr(client._client, "get", mock_get)
+
+    # First call: fail and open circuit
+    with pytest.raises(httpx.HTTPStatusError):
+        await client.get("/v2/users/self/egvs")
+    # Circuit is now open; next call should be blocked
+    with pytest.raises(CircuitBreakerOpenError):
+        await client.get("/v2/users/self/egvs")
+    
+    # Ensure the circuit breaker is in the open state
+    assert client.circuit_breaker.state == client.circuit_breaker.STATE_OPEN
+    
+    # Manually set _opened_since if it's None (which shouldn't happen, but let's be safe)
+    if client.circuit_breaker._opened_since is None:
+        client.circuit_breaker._opened_since = time.monotonic() - 0.5  # Set to a recent time
+    
+    # Fast-forward time to allow recovery
+    current_time = client.circuit_breaker._opened_since + 2
+    monkeypatch.setattr(time, "monotonic", lambda: current_time)
+    
+    # Next call: should be allowed (half-open), and succeed, closing the circuit
+    response = await client.get("/v2/users/self/egvs")
+    assert response.status_code == 200
+    # Circuit should be closed again
+    assert client.circuit_breaker.state == client.circuit_breaker.STATE_CLOSED
