@@ -67,6 +67,8 @@ class Settings(BaseSettings):
     # Service configuration
     service_env: str = Field("development", description="Service environment (development, staging, production)")
     log_level: str = Field("INFO", description="Logging level")
+    log_output: str = Field("stdout", description="Log output destination: stdout, file, or both")
+    log_file_path: Optional[str] = Field(None, description="Path to log file if log_output includes file")
     cors_origins: List[str] = Field(["*"], description="CORS allowed origins")
     secret_name: Optional[str] = Field(None, description="AWS Secrets Manager secret name")
 
@@ -240,18 +242,28 @@ class JSONFormatter(logging.Formatter):
                 
         return json.dumps(log_record)
 
-def setup_logging(level: str = "INFO"):
+def setup_logging(level: str = "INFO", output: str = "stdout", file_path: Optional[str] = None):
     """
     Set up structured JSON logging for the service.
     Args:
         level: Logging level as a string (e.g., 'INFO', 'DEBUG')
+        output: Log output destination: 'stdout', 'file', or 'both'
+        file_path: Path to log file if output includes 'file'
     """
     logger = logging.getLogger()
     logger.setLevel(level.upper())
     # Remove all handlers associated with the root logger object (avoid duplicate logs)
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(JSONFormatter())
-    logger.addHandler(handler)
+    handlers = []
+    if output in ("stdout", "both"):
+        stream_handler = logging.StreamHandler(sys.stdout)
+        stream_handler.setFormatter(JSONFormatter())
+        handlers.append(stream_handler)
+    if output in ("file", "both") and file_path:
+        file_handler = logging.FileHandler(file_path)
+        file_handler.setFormatter(JSONFormatter())
+        handlers.append(file_handler)
+    for h in handlers:
+        logger.addHandler(h)
     return logger 

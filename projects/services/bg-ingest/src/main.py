@@ -21,13 +21,15 @@ settings = get_settings()
 # Ensure we have a valid log level for testing scenarios where settings might be mocked
 try:
     log_level = settings.log_level
+    log_output = getattr(settings, 'log_output', 'stdout')
+    log_file_path = getattr(settings, 'log_file_path', None)
     # Handle case where settings.log_level is a MagicMock
     if not isinstance(log_level, (str, int)) or (isinstance(log_level, str) and not hasattr(logging, log_level.upper())):
         log_level = "INFO"
-    setup_logging(log_level)
+    setup_logging(log_level, log_output, log_file_path)
 except (ValueError, TypeError, AttributeError):
     # Default to INFO if there's any error with the log level
-    setup_logging("INFO")
+    setup_logging("INFO", "stdout", None)
 logger = logging.getLogger(__name__)
 
 security = HTTPBasic()
@@ -150,6 +152,7 @@ def create_app() -> FastAPI:
         Returns:
             dict: Health status
         """
+        logger.info("Health check endpoint called", extra={"endpoint": "/health"})
         return {"status": "healthy", "service": "bg-ingest"}
     
     # Mount the Prometheus metrics endpoint with auth middleware

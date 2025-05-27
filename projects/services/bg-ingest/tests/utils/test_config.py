@@ -2,13 +2,17 @@
 
 import os
 from unittest import mock
+import tempfile
+import logging
+import json
+import io
 
 import boto3
 import pytest
 from botocore.exceptions import ClientError
 from pydantic import ValidationError
 
-from src.utils.config import AwsSecretsManager, Settings, get_settings
+from src.utils.config import AwsSecretsManager, Settings, get_settings, setup_logging, JSONFormatter
 
 
 @pytest.fixture
@@ -185,3 +189,46 @@ def test_get_settings_caching(mock_env):
     
     # Both calls should return the same instance
     assert settings1 is settings2 
+
+
+def test_log_level_filtering():
+    logger = logging.getLogger()
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(JSONFormatter())
+    logger.addHandler(handler)
+    logger.setLevel(logging.WARNING)
+    try:
+        logger.debug("debug message")
+        logger.info("info message")
+        logger.warning("warning message")
+        logger.error("error message")
+        handler.flush()
+        stream.seek(0)
+        lines = stream.readlines()
+        messages = [json.loads(line)["message"] for line in lines if line.strip()]
+        assert any("warning message" == m for m in messages)
+        assert any("error message" == m for m in messages)
+        assert not any("debug message" == m for m in messages)
+        assert not any("info message" == m for m in messages)
+    finally:
+        logger.removeHandler(handler)
+
+
+def test_log_output_to_file():
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        log_path = tmp.name
+    try:
+        setup_logging("INFO", "file", log_path)
+        logger = logging.getLogger()
+        logger.info("file test message")
+        # Remove and close all handlers to release the file
+        for handler in logger.handlers[:]:
+            handler.flush()
+            handler.close()
+            logger.removeHandler(handler)
+        with open(log_path, "r") as f:
+            contents = f.read()
+        assert "file test message" in contents
+    finally:
+        os.remove(log_path) 

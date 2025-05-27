@@ -109,6 +109,71 @@ For production, sensitive values should be stored in AWS Secrets Manager:
 
 The configuration system will automatically fetch and apply these values at startup.
 
+## Logging and Metrics
+
+### Logging Configuration
+- **Log Level:** Set via `LOG_LEVEL` environment variable or `Settings.log_level` (e.g., `DEBUG`, `INFO`, `WARNING`, `ERROR`).
+- **Log Output:** Set via `LOG_OUTPUT` (`stdout`, `file`, or `both`).
+- **Log File Path:** Set via `LOG_FILE_PATH` if output includes `file`.
+- **Format:** All logs are structured as JSON for easy parsing and ingestion.
+
+**Example `.env` config:**
+```
+LOG_LEVEL=INFO
+LOG_OUTPUT=both
+LOG_FILE_PATH=logs/bg_ingest.log
+```
+
+**Example log output:**
+```json
+{"timestamp": "2025-05-27T03:51:49.559343", "level": "INFO", "message": "Health check endpoint called", "module": "main", "function": "health_check", "line": 155, "endpoint": "/health"}
+```
+
+### Metrics Endpoint
+- **Path:** `/metrics` (protected by HTTP Basic Auth)
+- **Username/Password:** Set via `METRICS_USER` and `METRICS_PASS` in `.env` or environment.
+- **Prometheus Scrape Example:** See `METRICS.md` for details.
+
+### PII Redaction Policy
+- Sensitive fields (tokens, secrets, passwords, user IDs, etc.) are redacted from logs.
+- All request/response logs are filtered to ensure no PII is present.
+- See tests for verification of PII redaction.
+
+### Correlation IDs
+- Each API call generates or propagates a correlation/request ID (UUID4).
+- Correlation IDs are included in all related logs for traceability.
+- You can pass a correlation ID from upstream systems; otherwise, one is generated automatically.
+
+### Usage Examples
+
+**Set log level and output in code:**
+```python
+from src.utils.config import setup_logging
+setup_logging("DEBUG", "file", "logs/bg_ingest.log")
+```
+
+**Access logs in tests:**
+```python
+import io, logging
+from src.utils.config import JSONFormatter
+stream = io.StringIO()
+handler = logging.StreamHandler(stream)
+handler.setFormatter(JSONFormatter())
+logging.getLogger().addHandler(handler)
+# ... run code ...
+handler.flush()
+stream.seek(0)
+for line in stream.readlines():
+    print(line)
+```
+
+**Query metrics endpoint:**
+```bash
+curl -u $METRICS_USER:$METRICS_PASS http://localhost:5001/metrics
+```
+
+For more details, see `METRICS.md` and code comments.
+
 ---
 
 ## 🏃‍♂️ Development
