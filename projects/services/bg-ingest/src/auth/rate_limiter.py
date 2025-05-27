@@ -1,5 +1,6 @@
 import asyncio
 import time
+import logging
 
 class AsyncRateLimiter:
     """
@@ -20,6 +21,7 @@ class AsyncRateLimiter:
         self._closed = False
         self._last_refill = time.monotonic()
         self._refill_task = asyncio.create_task(self._refill_loop())
+        self.logger = logging.getLogger("src.auth.rate_limiter")
 
     async def __aenter__(self):
         await self.acquire()
@@ -36,6 +38,17 @@ class AsyncRateLimiter:
                     return
                 waiter = asyncio.get_event_loop().create_future()
                 self._waiters.append(waiter)
+                # Log when a request is queued due to rate limiting
+                self.logger.warning(
+                    "Rate limiter: request queued due to no available tokens",
+                    extra={
+                        "log_type": "rate_limit_queue",
+                        "tokens": self._tokens,
+                        "queue_length": len(self._waiters),
+                        "max_calls": self.max_calls,
+                        "period": self.period
+                    }
+                )
             try:
                 await waiter
             except Exception:

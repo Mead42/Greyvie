@@ -21,7 +21,7 @@ async def mock_ensure_token_valid(self, correlation_id: str = None):
     """Mock implementation of _ensure_token_valid that accepts correlation_id"""
     pass
 
-async def mock_cb_before_request(self): # Renamed to avoid conflict if used elsewhere
+async def mock_cb_before_request(*args, **kwargs):
     return None
 
 async def mock_cb_record_success(self): # Renamed to avoid conflict

@@ -217,6 +217,18 @@ class DexcomApiClient:
                         pass
             jitter = random.uniform(0, delay / 2)
             actual_delay = delay + jitter
+            logger.warning(
+                "Retrying Dexcom API call",
+                extra={
+                    "log_type": "retry",
+                    "correlation_id": correlation_id,
+                    "attempt": attempt,
+                    "method": method,
+                    "endpoint": endpoint,
+                    "error": str(error_to_raise),
+                    "delay": actual_delay
+                }
+            )
             await asyncio.sleep(actual_delay)
 
     async def get(self, endpoint: str, params: dict = None, correlation_id: str = None):
@@ -226,7 +238,7 @@ class DexcomApiClient:
         Logs outgoing requests and incoming responses with PII redacted. Supports correlation IDs for tracing.
         """
         correlation_id = correlation_id or str(uuid.uuid4())
-        await self.circuit_breaker.before_request()
+        await self.circuit_breaker.before_request(correlation_id=correlation_id, endpoint=endpoint)
         try:
             async with self.rate_limiter:
                 await self._ensure_token_valid(correlation_id)
@@ -280,6 +292,18 @@ class DexcomApiClient:
                     latency = (datetime.utcnow() - start_time).total_seconds()
                     dexcom_api_call_latency_seconds.labels(method="GET", endpoint=endpoint).observe(latency)
                     dexcom_api_call_total.labels(method="GET", endpoint=endpoint, status=status).inc()
+                    if latency > 1.0:
+                        logger.warning(
+                            "Slow Dexcom API call",
+                            extra={
+                                "log_type": "slow_api_call",
+                                "correlation_id": correlation_id,
+                                "method": "GET",
+                                "url": url,
+                                "endpoint": endpoint,
+                                "latency": latency
+                            }
+                        )
             await self.circuit_breaker.record_success()
             return result
         except (httpx.TransportError, httpx.TimeoutException, httpx.HTTPStatusError) as e:
@@ -302,7 +326,7 @@ class DexcomApiClient:
         Logs outgoing requests and incoming responses with PII redacted. Supports correlation IDs for tracing.
         """
         correlation_id = correlation_id or str(uuid.uuid4())
-        await self.circuit_breaker.before_request()
+        await self.circuit_breaker.before_request(correlation_id=correlation_id, endpoint=endpoint)
         try:
             async with self.rate_limiter:
                 await self._ensure_token_valid(correlation_id)
@@ -356,6 +380,18 @@ class DexcomApiClient:
                     latency = (datetime.utcnow() - start_time).total_seconds()
                     dexcom_api_call_latency_seconds.labels(method="POST", endpoint=endpoint).observe(latency)
                     dexcom_api_call_total.labels(method="POST", endpoint=endpoint, status=status).inc()
+                    if latency > 1.0:
+                        logger.warning(
+                            "Slow Dexcom API call",
+                            extra={
+                                "log_type": "slow_api_call",
+                                "correlation_id": correlation_id,
+                                "method": "POST",
+                                "url": url,
+                                "endpoint": endpoint,
+                                "latency": latency
+                            }
+                        )
             await self.circuit_breaker.record_success()
             return result
         except (httpx.TransportError, httpx.TimeoutException, httpx.HTTPStatusError) as e:

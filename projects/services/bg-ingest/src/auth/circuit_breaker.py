@@ -31,7 +31,7 @@ class CircuitBreaker:
         self._lock = asyncio.Lock()
         self.logger = logger or logging.getLogger(__name__)
 
-    async def before_request(self):
+    async def before_request(self, correlation_id=None, endpoint=None):
         async with self._lock:
             if self.state == self.STATE_OPEN:
                 now = time.monotonic()
@@ -46,7 +46,14 @@ class CircuitBreaker:
                     self._half_open_attempts = 0
                     self.logger.info("Circuit breaker transitioning to HALF-OPEN.")
                 else:
-                    self.logger.warning("Circuit breaker is OPEN. Blocking request.")
+                    self.logger.warning(
+                        "Circuit breaker is OPEN. Blocking request.",
+                        extra={
+                            "log_type": "circuit_breaker_blocked",
+                            "correlation_id": correlation_id,
+                            "endpoint": endpoint
+                        }
+                    )
                     raise CircuitBreakerOpenError("Circuit breaker is open. Requests are temporarily blocked.")
             # If half-open, allow limited attempts
             if self.state == self.STATE_HALF_OPEN:
