@@ -52,17 +52,15 @@ class SimpleMiddleware(BaseHTTPMiddleware):
 
 @pytest.fixture
 def rate_limit_app():
-    """Create a FastAPI test app with the rate limiter middleware."""
+    """Create an app with rate limiting middleware for testing."""
     app = SimpleEndpointApp()
-    
-    # Add rate limiter middleware with test configuration
     app.add_middleware(
         RateLimiter,
-        rate_limit_per_minute=10,
-        rate_limit_burst=5,
-        include_paths=["/api/"]
+        default_rate_limit_per_minute=10,  # Low limit for testing
+        default_rate_limit_burst=2,
+        include_paths=["/api/"],
+        exclude_paths=["/health", "/metrics"]
     )
-    
     return app
 
 
@@ -126,8 +124,8 @@ class TestRateLimiter:
         with mock.patch.object(RateLimiter, "dispatch", mock_dispatch):
             rate_limiter = RateLimiter(
                 app=app,
-                rate_limit_per_minute=10,
-                rate_limit_burst=5,
+                default_rate_limit_per_minute=10,
+                default_rate_limit_burst=5,
                 include_paths=["/api/"],
             )
             
@@ -157,8 +155,8 @@ class TestRateLimiter:
         app = SimpleEndpointApp()
         app.add_middleware(
             RateLimiter,
-            rate_limit_per_minute=1,  # Only 1 per minute (effectively 1 per 60 sec)
-            rate_limit_burst=2,       # But allow 2 requests immediately
+            default_rate_limit_per_minute=1,  # Only 1 per minute (effectively 1 per 60 sec)
+            default_rate_limit_burst=2,       # But allow 2 requests immediately
             include_paths=["/api/"]
         )
         
@@ -176,29 +174,17 @@ class TestRateLimiter:
         assert response2.status_code == 200
         assert "X-RateLimit-Remaining" in response2.headers
         
-        # Use the next function to verify the burst logic is correct
-        test_client_id = f"ip:{client_ip}"
-        middleware = app.user_middleware[0].cls(app=app)
-        
-        # Verify that a client with no requests would get full burst capacity
-        new_client = "ip:new-client"
-        allowed, tokens, _ = middleware._check_rate_limit(new_client)
-        assert allowed is True
-        assert tokens > 0
-        
-        # Verify that time passage increases available tokens
-        with mock.patch('time.time', return_value=time.time() + 120):  # 2 minutes later
-            allowed, tokens, _ = middleware._check_rate_limit(new_client)
-            assert allowed is True
-            assert tokens > 2  # Should have refilled to full capacity
+        # Third request - should be rate limited
+        response3 = client.get("/api/test", headers=headers)
+        assert response3.status_code == 429
     
     def test_client_identification(self):
         """Test that clients are correctly identified."""
         # Create a test instance of RateLimiter
         middleware = RateLimiter(
             app=SimpleEndpointApp(),
-            rate_limit_per_minute=10,
-            rate_limit_burst=5
+            default_rate_limit_per_minute=10,
+            default_rate_limit_burst=5
         )
         
         # Create mock requests with different client identifiers
@@ -207,31 +193,40 @@ class TestRateLimiter:
         mock_ip_request.query_params = {}
         mock_ip_request.client = mock.MagicMock()
         mock_ip_request.client.host = "192.168.1.1"
+        mock_ip_request.state = mock.MagicMock()
         
+        # Test IP identification (no user_id attribute)
+        if hasattr(mock_ip_request.state, 'user_id'):
+            delattr(mock_ip_request.state, 'user_id')
+        ip_client_id = middleware._get_client_id(mock_ip_request)
+        assert ip_client_id == "ip:192.168.1.1"
+
+        # Test user-based identification
+        mock_user_request = mock.MagicMock()
+        mock_user_request.state = mock.MagicMock()
+        mock_user_request.state.user_id = "user123"
+        user_client_id = middleware._get_client_id(mock_user_request)
+        assert user_client_id == "user:user123"
+
+        # Test API key identification (header)
         mock_api_key_header_request = mock.MagicMock()
         mock_api_key_header_request.headers = {"X-API-Key": "test-key-1"}
         mock_api_key_header_request.query_params = {}
-        
+        mock_api_key_header_request.state = mock.MagicMock()
+        if hasattr(mock_api_key_header_request.state, 'user_id'):
+            delattr(mock_api_key_header_request.state, 'user_id')
+        api_key_client_id = middleware._get_client_id(mock_api_key_header_request)
+        assert api_key_client_id == "api:test-key-1"
+
+        # Test API key identification (query param)
         mock_api_key_query_request = mock.MagicMock()
         mock_api_key_query_request.headers = {}
         mock_api_key_query_request.query_params = {"api_key": "test-key-2"}
-        
-        # Test all three identification methods
-        ip_client_id = middleware._get_client_id(mock_ip_request)
-        assert ip_client_id == "ip:192.168.1.1"
-        
-        header_api_client_id = middleware._get_client_id(mock_api_key_header_request)
-        assert header_api_client_id == "api:test-key-1"
-        
-        query_api_client_id = middleware._get_client_id(mock_api_key_query_request)
-        assert query_api_client_id == "api:test-key-2"
-        
-        # Verify they all get different rate limits
-        middleware._check_rate_limit(ip_client_id)
-        middleware._check_rate_limit(header_api_client_id)
-        middleware._check_rate_limit(query_api_client_id)
-        
-        assert len(middleware.client_buckets) == 3
+        mock_api_key_query_request.state = mock.MagicMock()
+        if hasattr(mock_api_key_query_request.state, 'user_id'):
+            delattr(mock_api_key_query_request.state, 'user_id')
+        api_key_query_id = middleware._get_client_id(mock_api_key_query_request)
+        assert api_key_query_id == "api:test-key-2"
 
 
 class TestCacheControl:

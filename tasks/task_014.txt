@@ -1,6 +1,6 @@
 # Task ID: 14
 # Title: Implement Security Features
-# Status: pending
+# Status: in-progress
 # Dependencies: 2, 4
 # Priority: high
 # Description: Implement security features including authentication, authorization, rate limiting, and secure credential storage.
@@ -110,17 +110,27 @@
 7. Security testing for common vulnerabilities
 
 # Subtasks:
-## 1. Implement JWT Validation [pending]
+## 1. Implement JWT Validation [done]
 ### Dependencies: None
 ### Description: Set up JSON Web Token validation for secure authentication and authorization
 ### Details:
 Implement JWT validation including: token signature verification, expiration checking, issuer validation, and proper audience validation. Create middleware to validate tokens on protected routes. Include refresh token rotation strategy. Write test cases for valid tokens, expired tokens, tampered tokens, and proper authorization checks.
 
-## 2. Implement Rate Limiting [pending]
+## 2. Implement Rate Limiting [done]
 ### Dependencies: None
 ### Description: Add rate limiting to protect against brute force and DoS attacks
 ### Details:
 Implement IP-based and user-based rate limiting for sensitive endpoints. Configure appropriate limits for login attempts, API requests, and resource-intensive operations. Use token bucket or sliding window algorithm. Include graceful handling of rate limit errors with appropriate HTTP 429 responses. Create tests for rate limit triggering and reset behavior.
+<info added on 2025-05-27T04:28:49.068Z>
+Rate limiting implementation has been successfully completed with the following enhancements:
+
+- Enhanced RateLimiter to support both user-based and IP-based rate limiting
+- Added per-endpoint configuration with pattern matching for flexible rate limit rules
+- Fixed token bucket algorithm to properly track and enforce limits
+- Added comprehensive tests covering all rate limiting scenarios
+- Resolved middleware order issues (JWT validation now executes before RateLimiter)
+- All 141 tests are now passing
+</info added on 2025-05-27T04:28:49.068Z>
 
 ## 3. Implement Secure Credential Storage [pending]
 ### Dependencies: None

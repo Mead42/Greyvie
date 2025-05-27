@@ -7,3 +7,4 @@ boto3
 # moto  # Uncomment if you use AWS mocks in tests
 prometheus_client
 pydantic-settings
+PyJWT>=2.0.0

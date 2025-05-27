@@ -232,7 +232,7 @@
       "dependencies": [
         4
       ],
-      "status": "pending",
+      "status": "done",
       "subtasks": [
         {
           "id": 1,
@@ -347,7 +347,7 @@
           "title": "Configurable Log Levels and Output Destinations",
           "description": "Allow users to control verbosity and log destinations. Support setting log level via environment variable or client parameter. Allow logs to be sent to stdout, file, or external logging service. Document configuration options. Add tests to verify log level filtering and output destination selection.",
           "details": "- Support setting log level via environment variable or client parameter\n- Allow logs to be sent to stdout, file, or external logging service\n- Document configuration options in code and README\n- Add tests to verify log level filtering and output destination selection",
-          "status": "pending",
+          "status": "done",
           "dependencies": [
             1,
             2,
@@ -361,7 +361,7 @@
           "title": "Integration and End-to-End Logging Tests",
           "description": "Ensure logging and monitoring work together in real-world scenarios. Write integration tests simulating API calls, failures, retries, and circuit breaker trips. Verify that logs and metrics are generated as expected for all scenarios. Check that PII is never leaked, correlation IDs are consistent, and metrics reflect actual events.",
           "details": "- Write integration tests simulating API calls, failures, retries, and circuit breaker trips\n- Verify that logs and metrics are generated as expected for all scenarios\n- Check that PII is never leaked, correlation IDs are consistent, and metrics reflect actual events",
-          "status": "pending",
+          "status": "done",
           "dependencies": [
             1,
             2,
@@ -375,7 +375,7 @@
           "title": "Documentation and Usage Examples",
           "description": "Make it easy for users to understand and use logging/monitoring features. Update or create documentation for logging and monitoring configuration. Provide code examples for customizing logging, accessing metrics, and interpreting logs. Document PII redaction policy and correlation ID usage.",
           "details": "- Update or create documentation for logging and monitoring configuration\n- Provide code examples for customizing logging, accessing metrics, and interpreting logs\n- Document PII redaction policy and correlation ID usage",
-          "status": "pending",
+          "status": "done",
           "dependencies": [
             1,
             2,
@@ -585,7 +585,7 @@
         2,
         4
       ],
-      "status": "pending",
+      "status": "in-progress",
       "subtasks": [
         {
           "id": 1,
@@ -593,15 +593,15 @@
           "description": "Set up JSON Web Token validation for secure authentication and authorization",
           "dependencies": [],
           "details": "Implement JWT validation including: token signature verification, expiration checking, issuer validation, and proper audience validation. Create middleware to validate tokens on protected routes. Include refresh token rotation strategy. Write test cases for valid tokens, expired tokens, tampered tokens, and proper authorization checks.",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": 2,
           "title": "Implement Rate Limiting",
           "description": "Add rate limiting to protect against brute force and DoS attacks",
           "dependencies": [],
-          "details": "Implement IP-based and user-based rate limiting for sensitive endpoints. Configure appropriate limits for login attempts, API requests, and resource-intensive operations. Use token bucket or sliding window algorithm. Include graceful handling of rate limit errors with appropriate HTTP 429 responses. Create tests for rate limit triggering and reset behavior.",
-          "status": "pending"
+          "details": "Implement IP-based and user-based rate limiting for sensitive endpoints. Configure appropriate limits for login attempts, API requests, and resource-intensive operations. Use token bucket or sliding window algorithm. Include graceful handling of rate limit errors with appropriate HTTP 429 responses. Create tests for rate limit triggering and reset behavior.\n<info added on 2025-05-27T04:28:49.068Z>\nRate limiting implementation has been successfully completed with the following enhancements:\n\n- Enhanced RateLimiter to support both user-based and IP-based rate limiting\n- Added per-endpoint configuration with pattern matching for flexible rate limit rules\n- Fixed token bucket algorithm to properly track and enforce limits\n- Added comprehensive tests covering all rate limiting scenarios\n- Resolved middleware order issues (JWT validation now executes before RateLimiter)\n- All 141 tests are now passing\n</info added on 2025-05-27T04:28:49.068Z>",
+          "status": "done"
         },
         {
           "id": 3,

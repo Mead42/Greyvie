@@ -105,6 +105,11 @@ class Settings(BaseSettings):
     metrics_user: Optional[str] = Field(None, description="Username for /metrics basic auth", alias="METRICS_USER")
     metrics_pass: Optional[SecretStr] = Field(None, description="Password for /metrics basic auth", alias="METRICS_PASS")
 
+    # JWT Configuration
+    jwt_secret_key: str = Field("changeme", description="Secret key for JWT signature validation")
+    jwt_issuer: str = Field("bg-ingest", description="Expected JWT issuer (iss)")
+    jwt_audience: str = Field("bg-ingest-users", description="Expected JWT audience (aud)")
+
     # CORS Validation
     @field_validator("cors_origins")
     @classmethod

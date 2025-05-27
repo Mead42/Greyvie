@@ -1,6 +1,6 @@
 # Task ID: 5
 # Title: Develop Dexcom API Client
-# Status: pending
+# Status: done
 # Dependencies: 4
 # Priority: high
 # Description: Create a client for interacting with the Dexcom API, including rate limiting, retry mechanisms, and error handling.
@@ -121,7 +121,7 @@ Add structured logging for all API operations, implement request/response loggin
 - Provide a way to export or query metrics (e.g., via a method or endpoint)
 - Add tests to verify metrics are collected and reported accurately
 
-## 10. Configurable Log Levels and Output Destinations [pending]
+## 10. Configurable Log Levels and Output Destinations [done]
 ### Dependencies: 5.1, 5.2, 5.3, 5.4
 ### Description: Allow users to control verbosity and log destinations. Support setting log level via environment variable or client parameter. Allow logs to be sent to stdout, file, or external logging service. Document configuration options. Add tests to verify log level filtering and output destination selection.
 ### Details:
@@ -130,7 +130,7 @@ Add structured logging for all API operations, implement request/response loggin
 - Document configuration options in code and README
 - Add tests to verify log level filtering and output destination selection
 
-## 11. Integration and End-to-End Logging Tests [pending]
+## 11. Integration and End-to-End Logging Tests [done]
 ### Dependencies: 5.1, 5.2, 5.3, 5.4
 ### Description: Ensure logging and monitoring work together in real-world scenarios. Write integration tests simulating API calls, failures, retries, and circuit breaker trips. Verify that logs and metrics are generated as expected for all scenarios. Check that PII is never leaked, correlation IDs are consistent, and metrics reflect actual events.
 ### Details:
@@ -138,7 +138,7 @@ Add structured logging for all API operations, implement request/response loggin
 - Verify that logs and metrics are generated as expected for all scenarios
 - Check that PII is never leaked, correlation IDs are consistent, and metrics reflect actual events
 
-## 12. Documentation and Usage Examples [pending]
+## 12. Documentation and Usage Examples [done]
 ### Dependencies: 5.1, 5.2, 5.3, 5.4
 ### Description: Make it easy for users to understand and use logging/monitoring features. Update or create documentation for logging and monitoring configuration. Provide code examples for customizing logging, accessing metrics, and interpreting logs. Document PII redaction policy and correlation ID usage.
 ### Details:

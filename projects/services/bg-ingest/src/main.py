@@ -4,13 +4,15 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any, Dict
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from starlette.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, make_asgi_app
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from starlette.status import HTTP_401_UNAUTHORIZED
 import base64
+import jwt
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.utils.config import Settings, get_settings, setup_logging
 from src.data.dynamodb import get_dynamodb_client
@@ -105,6 +107,41 @@ class MetricsAuthMiddleware:
         await self.app(scope, receive, send)
 
 
+class JWTAuthMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app):
+        super().__init__(app)
+        self.secret_key = settings.jwt_secret_key
+        self.issuer = settings.jwt_issuer
+        self.audience = settings.jwt_audience
+        self.public_paths = {"/health", "/metrics", "/metrics/", "/docs", "/openapi.json"}
+
+    async def dispatch(self, request: Request, call_next):
+        # Skip auth for public endpoints
+        if request.url.path in self.public_paths:
+            return await call_next(request)
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return JSONResponse(status_code=401, content={"detail": "Missing or invalid authorization header"})
+        token = auth_header.replace("Bearer ", "")
+        try:
+            payload = jwt.decode(
+                token,
+                self.secret_key,
+                algorithms=["HS256"],
+                issuer=self.issuer,
+                audience=self.audience,
+                options={"require": ["exp", "iss", "aud", "sub"]}
+            )
+            # Attach user info to request.state
+            request.state.user_id = payload["sub"]
+            request.state.scopes = payload.get("scopes", [])
+        except jwt.ExpiredSignatureError:
+            return JSONResponse(status_code=401, content={"detail": "Token has expired"})
+        except jwt.InvalidTokenError as e:
+            return JSONResponse(status_code=401, content={"detail": f"Invalid token: {str(e)}"})
+        return await call_next(request)
+
+
 def create_app() -> FastAPI:
     """
     Create and configure the FastAPI application.
@@ -132,14 +169,17 @@ def create_app() -> FastAPI:
     # Rate limiting middleware
     app.add_middleware(
         RateLimiter,
-        rate_limit_per_minute=120,  # 2 requests per second
-        rate_limit_burst=20,         # Allow burst of 20 requests
+        default_rate_limit_per_minute=120,  # 2 requests per second
+        default_rate_limit_burst=20,         # Allow burst of 20 requests
         include_paths=["/api/"],
         exclude_paths=["/health", "/metrics"]
     )
     
     # Cache control middleware
     app.add_middleware(CacheControl)
+    
+    # Add JWT middleware
+    app.add_middleware(JWTAuthMiddleware)
     
     # Add routers
     app.include_router(readings_router, prefix="/api/bg", tags=["glucose"])
