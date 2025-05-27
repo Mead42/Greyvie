@@ -165,6 +165,10 @@ class TestAppLifespan:
     @pytest.mark.asyncio
     async def test_startup_creates_tables(self, mock_dynamodb_client, mock_settings):
         """Test that the app creates DynamoDB tables during startup."""
+        # Setup proper log_level on mock_settings to avoid TypeError
+        mock_settings.log_level = "INFO"
+        mock_settings.service_env = "development"
+        
         # Setup mocks at a lower level to ensure they're used correctly
         with mock.patch("src.utils.config.get_settings", return_value=mock_settings), \
              mock.patch("src.data.dynamodb.get_dynamodb_client", return_value=mock_dynamodb_client):

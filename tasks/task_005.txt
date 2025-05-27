@@ -83,3 +83,66 @@ Implement circuit breaker states (closed, open, half-open), configure failure th
 ### Details:
 Add structured logging for all API operations, implement request/response logging with PII redaction, create performance metrics collection (latency, error rates, etc.), add correlation IDs for request tracing, and implement configurable log levels. Test log output for different scenarios, verify PII redaction, and validate metrics collection.
 
+## 6. Structured Logging Foundation [in-progress]
+### Dependencies: 5.1, 5.2, 5.3, 5.4
+### Description: Establish a consistent, structured logging setup for the Dexcom API client. Integrate Python’s logging module (or structlog), define log format (JSON or key-value), set up log levels, ensure logs include timestamp, log level, module, and message. Add unit tests to verify log output format and level filtering.
+### Details:
+- Integrate Python’s logging module (or structlog for richer structure)
+- Define log format (JSON or key-value pairs) for easy parsing
+- Set up log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL) and allow configuration via environment or client options
+- Ensure all logs include timestamp, log level, module, and message
+- Add unit tests to verify log output format and level filtering
+
+## 7. Request/Response Logging with PII Redaction [pending]
+### Dependencies: 5.1, 5.2, 5.3, 5.4
+### Description: Log all API requests and responses, ensuring no sensitive data (PII) is exposed. Implement middleware or wrapper to log outgoing requests and incoming responses, redact PII fields, and log request method, URL, status code, latency, and response size. Add tests to verify PII is never logged and logs contain required metadata.
+### Details:
+- Implement middleware or wrapper in the client to log outgoing requests and incoming responses
+- Identify and redact PII fields (e.g., tokens, user IDs, glucose values if required)
+- Log request method, URL, status code, latency, and response size
+- Add tests to verify PII is never logged and that logs contain required metadata
+
+## 8. Correlation IDs and Request Tracing [pending]
+### Dependencies: 5.1, 5.2, 5.3, 5.4
+### Description: Enable tracing of requests across logs for debugging and monitoring. Generate a unique correlation/request ID for each API call, propagate through all logs, and allow passing a correlation ID from upstream. Add tests to ensure correlation IDs are present and consistent in logs.
+### Details:
+- Generate a unique correlation/request ID for each API call (UUID4)
+- Propagate correlation ID through all logs related to a single request
+- Optionally, allow passing a correlation ID from upstream (for integration with larger systems)
+- Add tests to ensure correlation IDs are present and consistent in logs
+
+## 9. Performance Metrics Collection [pending]
+### Dependencies: 5.1, 5.2, 5.3, 5.4
+### Description: Track and expose key performance metrics for the client. Measure and record API call latency, error rates, and success rates. Track rate limit events, retries, and circuit breaker state changes. Use a metrics library or simple stats collector. Provide a way to export or query metrics. Add tests to verify metrics are collected and reported accurately.
+### Details:
+- Measure and record API call latency, error rates, and success rates
+- Track rate limit events, retries, and circuit breaker state changes
+- Use a metrics library (e.g., prometheus_client) or a simple in-memory/exportable stats collector
+- Provide a way to export or query metrics (e.g., via a method or endpoint)
+- Add tests to verify metrics are collected and reported accurately
+
+## 10. Configurable Log Levels and Output Destinations [pending]
+### Dependencies: 5.1, 5.2, 5.3, 5.4
+### Description: Allow users to control verbosity and log destinations. Support setting log level via environment variable or client parameter. Allow logs to be sent to stdout, file, or external logging service. Document configuration options. Add tests to verify log level filtering and output destination selection.
+### Details:
+- Support setting log level via environment variable or client parameter
+- Allow logs to be sent to stdout, file, or external logging service
+- Document configuration options in code and README
+- Add tests to verify log level filtering and output destination selection
+
+## 11. Integration and End-to-End Logging Tests [pending]
+### Dependencies: 5.1, 5.2, 5.3, 5.4
+### Description: Ensure logging and monitoring work together in real-world scenarios. Write integration tests simulating API calls, failures, retries, and circuit breaker trips. Verify that logs and metrics are generated as expected for all scenarios. Check that PII is never leaked, correlation IDs are consistent, and metrics reflect actual events.
+### Details:
+- Write integration tests simulating API calls, failures, retries, and circuit breaker trips
+- Verify that logs and metrics are generated as expected for all scenarios
+- Check that PII is never leaked, correlation IDs are consistent, and metrics reflect actual events
+
+## 12. Documentation and Usage Examples [pending]
+### Dependencies: 5.1, 5.2, 5.3, 5.4
+### Description: Make it easy for users to understand and use logging/monitoring features. Update or create documentation for logging and monitoring configuration. Provide code examples for customizing logging, accessing metrics, and interpreting logs. Document PII redaction policy and correlation ID usage.
+### Details:
+- Update or create documentation for logging and monitoring configuration
+- Provide code examples for customizing logging, accessing metrics, and interpreting logs
+- Document PII redaction policy and correlation ID usage
+

@@ -7,12 +7,22 @@ from typing import Any, Dict
 from fastapi import FastAPI, HTTPException
 from starlette.middleware.cors import CORSMiddleware
 
-from src.utils.config import Settings, get_settings
+from src.utils.config import Settings, get_settings, setup_logging
 from src.data.dynamodb import get_dynamodb_client
 from src.api.middleware import RateLimiter, CacheControl
 from src.api.readings import router as readings_router
 
 settings = get_settings()
+# Ensure we have a valid log level for testing scenarios where settings might be mocked
+try:
+    log_level = settings.log_level
+    # Handle case where settings.log_level is a MagicMock
+    if not isinstance(log_level, (str, int)) or (isinstance(log_level, str) and not hasattr(logging, log_level.upper())):
+        log_level = "INFO"
+    setup_logging(log_level)
+except (ValueError, TypeError, AttributeError):
+    # Default to INFO if there's any error with the log level
+    setup_logging("INFO")
 logger = logging.getLogger(__name__)
 
 

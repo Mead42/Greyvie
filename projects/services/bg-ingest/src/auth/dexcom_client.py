@@ -7,8 +7,13 @@ from src.auth.rate_limiter import AsyncRateLimiter
 from src.auth.circuit_breaker import CircuitBreaker, CircuitBreakerOpenError
 import asyncio
 import logging
+from src.utils.config import get_settings, setup_logging
 
 T = TypeVar('T')
+
+settings = get_settings()
+setup_logging(settings.log_level)
+logger = logging.getLogger(__name__)
 
 class DexcomApiClient:
     """
@@ -142,10 +147,14 @@ class DexcomApiClient:
                 status = e.response.status_code
                 # Only retry on 429 or 5xx
                 if status == 429:
-                    logging.warning(
-                        f"Rate limit hit (429). Attempt {attempt + 1}/{self.max_retries + 1}. "
-                        f"Retrying after {e.response.headers.get('Retry-After', self.base_delay * (2 ** attempt))}s. "
-                        f"URL: {e.request.url}"
+                    logger.warning(
+                        "Rate limit hit (429). Retrying.",
+                        extra={
+                            "attempt": attempt + 1,
+                            "max_retries": self.max_retries + 1,
+                            "retry_after": e.response.headers.get("Retry-After", self.base_delay * (2 ** attempt)),
+                            "url": str(e.request.url)
+                        }
                     )
                 retryable = (status == 429) or (500 <= status < 600)
             else:
@@ -167,12 +176,22 @@ class DexcomApiClient:
                     try:
                         delay = float(retry_after_header)
                     except ValueError:
-                        logging.warning(f"Invalid Retry-After header: {retry_after_header}. Using exponential backoff: {delay}s")
+                        logger.warning(
+                            "Invalid Retry-After header. Using exponential backoff.",
+                            extra={"retry_after": retry_after_header, "delay": delay}
+                        )
 
             # Add jitter to avoid thundering herd
             jitter = random.uniform(0, delay / 2)
             actual_delay = delay + jitter
-            logging.debug(f"Retry attempt {attempt}/{self.max_retries + 1}. Waiting {actual_delay:.2f}s before retrying.")
+            logger.debug(
+                "Retrying after delay.",
+                extra={
+                    "attempt": attempt,
+                    "max_retries": self.max_retries + 1,
+                    "actual_delay": actual_delay
+                }
+            )
             await asyncio.sleep(actual_delay)
 
     async def get(self, endpoint: str, params: dict = None):
@@ -208,7 +227,10 @@ class DexcomApiClient:
                 await self.circuit_breaker.record_failure()
             raise
         except CircuitBreakerOpenError:
-            logging.error("Circuit breaker is OPEN. GET request blocked.")
+            logger.error(
+                "Circuit breaker is OPEN. GET request blocked.",
+                extra={"endpoint": endpoint, "params": params}
+            )
             raise
 
     async def post(self, endpoint: str, data: dict = None):
@@ -243,7 +265,10 @@ class DexcomApiClient:
                 await self.circuit_breaker.record_failure()
             raise
         except CircuitBreakerOpenError:
-            logging.error("Circuit breaker is OPEN. POST request blocked.")
+            logger.error(
+                "Circuit breaker is OPEN. POST request blocked.",
+                extra={"endpoint": endpoint, "data": data}
+            )
             raise
 
     async def parse_response(self, response, model: Type[T] = None) -> T:

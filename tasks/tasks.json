@@ -285,6 +285,104 @@
           ],
           "details": "Add structured logging for all API operations, implement request/response logging with PII redaction, create performance metrics collection (latency, error rates, etc.), add correlation IDs for request tracing, and implement configurable log levels. Test log output for different scenarios, verify PII redaction, and validate metrics collection.",
           "status": "pending"
+        },
+        {
+          "id": 6,
+          "title": "Structured Logging Foundation",
+          "description": "Establish a consistent, structured logging setup for the Dexcom API client. Integrate Python’s logging module (or structlog), define log format (JSON or key-value), set up log levels, ensure logs include timestamp, log level, module, and message. Add unit tests to verify log output format and level filtering.",
+          "details": "- Integrate Python’s logging module (or structlog for richer structure)\n- Define log format (JSON or key-value pairs) for easy parsing\n- Set up log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL) and allow configuration via environment or client options\n- Ensure all logs include timestamp, log level, module, and message\n- Add unit tests to verify log output format and level filtering",
+          "status": "in-progress",
+          "dependencies": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "parentTaskId": 5
+        },
+        {
+          "id": 7,
+          "title": "Request/Response Logging with PII Redaction",
+          "description": "Log all API requests and responses, ensuring no sensitive data (PII) is exposed. Implement middleware or wrapper to log outgoing requests and incoming responses, redact PII fields, and log request method, URL, status code, latency, and response size. Add tests to verify PII is never logged and logs contain required metadata.",
+          "details": "- Implement middleware or wrapper in the client to log outgoing requests and incoming responses\n- Identify and redact PII fields (e.g., tokens, user IDs, glucose values if required)\n- Log request method, URL, status code, latency, and response size\n- Add tests to verify PII is never logged and that logs contain required metadata",
+          "status": "pending",
+          "dependencies": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "parentTaskId": 5
+        },
+        {
+          "id": 8,
+          "title": "Correlation IDs and Request Tracing",
+          "description": "Enable tracing of requests across logs for debugging and monitoring. Generate a unique correlation/request ID for each API call, propagate through all logs, and allow passing a correlation ID from upstream. Add tests to ensure correlation IDs are present and consistent in logs.",
+          "details": "- Generate a unique correlation/request ID for each API call (UUID4)\n- Propagate correlation ID through all logs related to a single request\n- Optionally, allow passing a correlation ID from upstream (for integration with larger systems)\n- Add tests to ensure correlation IDs are present and consistent in logs",
+          "status": "pending",
+          "dependencies": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "parentTaskId": 5
+        },
+        {
+          "id": 9,
+          "title": "Performance Metrics Collection",
+          "description": "Track and expose key performance metrics for the client. Measure and record API call latency, error rates, and success rates. Track rate limit events, retries, and circuit breaker state changes. Use a metrics library or simple stats collector. Provide a way to export or query metrics. Add tests to verify metrics are collected and reported accurately.",
+          "details": "- Measure and record API call latency, error rates, and success rates\n- Track rate limit events, retries, and circuit breaker state changes\n- Use a metrics library (e.g., prometheus_client) or a simple in-memory/exportable stats collector\n- Provide a way to export or query metrics (e.g., via a method or endpoint)\n- Add tests to verify metrics are collected and reported accurately",
+          "status": "pending",
+          "dependencies": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "parentTaskId": 5
+        },
+        {
+          "id": 10,
+          "title": "Configurable Log Levels and Output Destinations",
+          "description": "Allow users to control verbosity and log destinations. Support setting log level via environment variable or client parameter. Allow logs to be sent to stdout, file, or external logging service. Document configuration options. Add tests to verify log level filtering and output destination selection.",
+          "details": "- Support setting log level via environment variable or client parameter\n- Allow logs to be sent to stdout, file, or external logging service\n- Document configuration options in code and README\n- Add tests to verify log level filtering and output destination selection",
+          "status": "pending",
+          "dependencies": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "parentTaskId": 5
+        },
+        {
+          "id": 11,
+          "title": "Integration and End-to-End Logging Tests",
+          "description": "Ensure logging and monitoring work together in real-world scenarios. Write integration tests simulating API calls, failures, retries, and circuit breaker trips. Verify that logs and metrics are generated as expected for all scenarios. Check that PII is never leaked, correlation IDs are consistent, and metrics reflect actual events.",
+          "details": "- Write integration tests simulating API calls, failures, retries, and circuit breaker trips\n- Verify that logs and metrics are generated as expected for all scenarios\n- Check that PII is never leaked, correlation IDs are consistent, and metrics reflect actual events",
+          "status": "pending",
+          "dependencies": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "parentTaskId": 5
+        },
+        {
+          "id": 12,
+          "title": "Documentation and Usage Examples",
+          "description": "Make it easy for users to understand and use logging/monitoring features. Update or create documentation for logging and monitoring configuration. Provide code examples for customizing logging, accessing metrics, and interpreting logs. Document PII redaction policy and correlation ID usage.",
+          "details": "- Update or create documentation for logging and monitoring configuration\n- Provide code examples for customizing logging, accessing metrics, and interpreting logs\n- Document PII redaction policy and correlation ID usage",
+          "status": "pending",
+          "dependencies": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "parentTaskId": 5
         }
       ]
     },
