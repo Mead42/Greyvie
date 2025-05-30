@@ -601,7 +601,7 @@
           "description": "Create a system for securely storing and accessing API keys and other secrets",
           "dependencies": [],
           "details": "1. Set up environment variable management for development and production\n2. Integrate with a secrets manager (AWS Secrets Manager, HashiCorp Vault, etc.)\n3. Create an abstraction layer for accessing secrets\n4. Implement caching strategy to minimize API calls to secrets manager\n5. Set up proper IAM/access controls for the secrets manager\n6. Document the secrets management workflow for developers",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": 3,
@@ -632,7 +632,7 @@
             1
           ],
           "details": "1. Implement constant-time password verification\n2. Create account lockout mechanism after failed attempts\n3. Add progressive delays between login attempts\n4. Implement notification system for suspicious login activities\n5. Create password reset functionality with secure tokens\n6. Add logging for authentication events\n7. Test the system against timing attacks",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": 6,

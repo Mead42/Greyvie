@@ -121,7 +121,7 @@
 5. Add unit tests to verify hashing functionality
 6. Document the implementation with security rationale
 
-## 2. Implement Secure Storage for API Keys and Secrets [pending]
+## 2. Implement Secure Storage for API Keys and Secrets [done]
 ### Dependencies: None
 ### Description: Create a system for securely storing and accessing API keys and other secrets
 ### Details:
@@ -166,7 +166,7 @@ Implementation Plan for Password Hashing with Argon2:
 5. Set up monitoring and alerts for key expiration
 6. Document the key rotation process and recovery procedures
 
-## 5. Implement Password Verification and Failed Attempt Handling [pending]
+## 5. Implement Password Verification and Failed Attempt Handling [done]
 ### Dependencies: 14.1
 ### Description: Create secure password verification with protection against brute force attacks
 ### Details:
