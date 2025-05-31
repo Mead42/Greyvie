@@ -13,11 +13,13 @@ from starlette.status import HTTP_401_UNAUTHORIZED
 import base64
 import jwt
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse as StarletteJSONResponse
 
 from src.utils.config import Settings, get_settings, setup_logging
 from src.data.dynamodb import get_dynamodb_client
 from src.api.middleware import RateLimiter, CacheControl
 from src.api.readings import router as readings_router
+from src.utils.logging_utils import redact_sensitive_data
 
 settings = get_settings()
 # Ensure we have a valid log level for testing scenarios where settings might be mocked
@@ -142,6 +144,37 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+class RedactSensitiveDataMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware to redact sensitive fields from request and response payloads in logs and error responses.
+    Does not modify data passed to endpoints, only what is logged or returned in error responses.
+    """
+    async def dispatch(self, request, call_next):
+        # Redact sensitive fields in request body for logging (if JSON)
+        if request.headers.get("content-type", "").startswith("application/json"):
+            try:
+                body = await request.json()
+                safe_body = redact_sensitive_data(body)
+                # Example: logger.info("Request body", extra={"body": safe_body})
+            except Exception:
+                pass  # Ignore if not JSON or error
+        # Process response
+        response = await call_next(request)
+        if response.headers.get("content-type", "").startswith("application/json"):
+            try:
+                payload = await response.body()
+                import json
+                data = json.loads(payload)
+                safe_data = redact_sensitive_data(data)
+                # Example: logger.info("Response body", extra={"body": safe_data})
+                # Optionally, replace response body with redacted version for error responses
+                if response.status_code >= 400:
+                    return StarletteJSONResponse(safe_data, status_code=response.status_code)
+            except Exception:
+                pass  # Ignore if not JSON or error
+        return response
+
+
 def create_app() -> FastAPI:
     """
     Create and configure the FastAPI application.
@@ -181,6 +214,9 @@ def create_app() -> FastAPI:
     # Add JWT middleware
     app.add_middleware(JWTAuthMiddleware)
     
+    # Add Redact Sensitive Data middleware
+    app.add_middleware(RedactSensitiveDataMiddleware)
+    
     # Add routers
     app.include_router(readings_router, prefix="/api/bg", tags=["glucose"])
     
@@ -203,6 +239,24 @@ def create_app() -> FastAPI:
         "/metrics",
         MetricsAuthMiddleware(metrics_app, metrics_user, metrics_pass)
     )
+
+    # Global exception handler to prevent leaking sensitive data
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        # Default error structure
+        detail = str(exc)
+        # If it's an HTTPException, use its detail
+        if isinstance(exc, HTTPException):
+            detail = exc.detail
+        # Redact sensitive data if detail is a dict or list
+        safe_detail = redact_sensitive_data(detail) if isinstance(detail, (dict, list)) else detail
+        return JSONResponse(
+            status_code=getattr(exc, 'status_code', 500),
+            content={
+                "status": "error",
+                "message": safe_detail,
+            },
+        )
 
     return app
 

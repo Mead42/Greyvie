@@ -1,6 +1,6 @@
 # Task ID: 14
 # Title: Implement Security Features
-# Status: in-progress
+# Status: done
 # Dependencies: 2, 4
 # Priority: high
 # Description: Implement security features including authentication, authorization, rate limiting, and secure credential storage.
@@ -155,7 +155,7 @@ Implementation Plan for Password Hashing with Argon2:
 7. Ensure no plaintext passwords or hashes are logged or exposed.
 </info added on 2025-05-27T15:20:00.002Z>
 
-## 4. Develop Key Rotation Strategy [pending]
+## 4. Develop Key Rotation Strategy [done]
 ### Dependencies: 14.2, 14.3
 ### Description: Create a system for regular rotation of encryption keys and credentials
 ### Details:
@@ -178,7 +178,7 @@ Implementation Plan for Password Hashing with Argon2:
 6. Add logging for authentication events
 7. Test the system against timing attacks
 
-## 6. Ensure No Plaintext Credentials in Logs or Errors [pending]
+## 6. Ensure No Plaintext Credentials in Logs or Errors [done]
 ### Dependencies: 14.1, 14.2, 14.5
 ### Description: Implement safeguards to prevent credentials from appearing in logs, error messages, or responses
 ### Details:
