@@ -1,6 +1,6 @@
 # Task ID: 7
 # Title: Implement Data Deduplication Service
-# Status: pending
+# Status: in-progress
 # Dependencies: 3, 6
 # Priority: medium
 # Description: Create a service to detect and handle duplicate blood glucose readings during data ingestion.

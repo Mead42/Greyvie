@@ -397,7 +397,7 @@
         3,
         5
       ],
-      "status": "pending",
+      "status": "in-progress",
       "subtasks": []
     },
     {
@@ -571,7 +571,7 @@
       "dependencies": [
         1
       ],
-      "status": "pending",
+      "status": "done",
       "subtasks": []
     },
     {
@@ -585,64 +585,66 @@
         2,
         4
       ],
-      "status": "in-progress",
+      "status": "done",
       "subtasks": [
         {
           "id": 1,
-          "title": "Implement JWT Validation",
-          "description": "Set up JSON Web Token validation for secure authentication and authorization",
+          "title": "Implement Password Hashing with Argon2",
+          "description": "Set up a secure password hashing system using Argon2 for user credentials",
           "dependencies": [],
-          "details": "Implement JWT validation including: token signature verification, expiration checking, issuer validation, and proper audience validation. Create middleware to validate tokens on protected routes. Include refresh token rotation strategy. Write test cases for valid tokens, expired tokens, tampered tokens, and proper authorization checks.",
+          "details": "1. Install Argon2 library for your platform\n2. Configure appropriate memory, iterations, and parallelism parameters\n3. Create a password hashing service/utility\n4. Implement functions for hashing new passwords\n5. Add unit tests to verify hashing functionality\n6. Document the implementation with security rationale",
           "status": "done"
         },
         {
           "id": 2,
-          "title": "Implement Rate Limiting",
-          "description": "Add rate limiting to protect against brute force and DoS attacks",
+          "title": "Implement Secure Storage for API Keys and Secrets",
+          "description": "Create a system for securely storing and accessing API keys and other secrets",
           "dependencies": [],
-          "details": "Implement IP-based and user-based rate limiting for sensitive endpoints. Configure appropriate limits for login attempts, API requests, and resource-intensive operations. Use token bucket or sliding window algorithm. Include graceful handling of rate limit errors with appropriate HTTP 429 responses. Create tests for rate limit triggering and reset behavior.\n<info added on 2025-05-27T04:28:49.068Z>\nRate limiting implementation has been successfully completed with the following enhancements:\n\n- Enhanced RateLimiter to support both user-based and IP-based rate limiting\n- Added per-endpoint configuration with pattern matching for flexible rate limit rules\n- Fixed token bucket algorithm to properly track and enforce limits\n- Added comprehensive tests covering all rate limiting scenarios\n- Resolved middleware order issues (JWT validation now executes before RateLimiter)\n- All 141 tests are now passing\n</info added on 2025-05-27T04:28:49.068Z>",
+          "details": "1. Set up environment variable management for development and production\n2. Integrate with a secrets manager (AWS Secrets Manager, HashiCorp Vault, etc.)\n3. Create an abstraction layer for accessing secrets\n4. Implement caching strategy to minimize API calls to secrets manager\n5. Set up proper IAM/access controls for the secrets manager\n6. Document the secrets management workflow for developers",
           "status": "done"
         },
         {
           "id": 3,
-          "title": "Implement Secure Credential Storage",
-          "description": "Set up secure storage for user credentials and sensitive information",
-          "dependencies": [],
-          "details": "Implement password hashing using bcrypt or Argon2 with appropriate work factors. Set up secure storage for API keys and secrets using environment variables or a secrets manager. Ensure database encryption for sensitive fields. Create a key rotation strategy. Test password verification, failed attempts handling, and ensure no plaintext credentials in logs or error messages.",
-          "status": "pending"
+          "title": "Implement Database Encryption for Sensitive Fields",
+          "description": "Set up field-level encryption for sensitive data stored in the database",
+          "dependencies": [
+            2
+          ],
+          "details": "1. Identify all sensitive fields requiring encryption\n2. Set up encryption key management\n3. Implement transparent data encryption at the database level if supported\n4. Create data access layer that handles encryption/decryption\n5. Update database schema and models to support encrypted fields\n6. Add unit tests for encryption/decryption operations\n7. Document the encryption strategy\n<info added on 2025-05-27T15:20:00.002Z>\nImplementation Plan for Password Hashing with Argon2:\n\n1. Install the Argon2 library (argon2-cffi for Python).\n2. Configure secure parameters: time_cost=3, memory_cost=65536, parallelism=2.\n3. Create a password hashing utility class with methods for hashing and verifying passwords.\n4. Integrate the utility with user registration (hash before storing) and login (verify input password).\n5. Add unit tests for correct/incorrect/edge-case passwords.\n6. Document the implementation and security rationale.\n7. Ensure no plaintext passwords or hashes are logged or exposed.\n</info added on 2025-05-27T15:20:00.002Z>",
+          "status": "done"
         },
         {
           "id": 4,
-          "title": "Implement Input Validation",
-          "description": "Add comprehensive input validation to prevent injection attacks",
+          "title": "Develop Key Rotation Strategy",
+          "description": "Create a system for regular rotation of encryption keys and credentials",
           "dependencies": [
-            1,
+            2,
             3
           ],
-          "details": "Implement server-side validation for all user inputs using a validation library. Create schema validation for API requests. Add sanitization for inputs that will be displayed or stored. Protect against SQL injection, XSS, and CSRF attacks. Test with malicious inputs including SQL injection payloads, script tags, and oversized payloads.",
-          "status": "pending"
+          "details": "1. Design key versioning system\n2. Implement automated key rotation schedule\n3. Create procedures for emergency key rotation\n4. Develop migration strategy for re-encrypting data with new keys\n5. Set up monitoring and alerts for key expiration\n6. Document the key rotation process and recovery procedures",
+          "status": "done"
         },
         {
           "id": 5,
-          "title": "Implement Audit Logging",
-          "description": "Set up comprehensive security audit logging system",
+          "title": "Implement Password Verification and Failed Attempt Handling",
+          "description": "Create secure password verification with protection against brute force attacks",
           "dependencies": [
-            1,
-            2
+            1
           ],
-          "details": "Implement detailed audit logging for authentication events, authorization failures, and sensitive operations. Include timestamp, user ID, IP address, action type, and result in logs. Ensure logs are tamper-evident and stored securely. Implement log rotation and retention policies. Test log generation for various security events and verify log integrity.",
-          "status": "pending"
+          "details": "1. Implement constant-time password verification\n2. Create account lockout mechanism after failed attempts\n3. Add progressive delays between login attempts\n4. Implement notification system for suspicious login activities\n5. Create password reset functionality with secure tokens\n6. Add logging for authentication events\n7. Test the system against timing attacks",
+          "status": "done"
         },
         {
           "id": 6,
-          "title": "Implement CORS Protection",
-          "description": "Configure Cross-Origin Resource Sharing (CORS) policies",
+          "title": "Ensure No Plaintext Credentials in Logs or Errors",
+          "description": "Implement safeguards to prevent credentials from appearing in logs, error messages, or responses",
           "dependencies": [
             1,
-            4
+            2,
+            5
           ],
-          "details": "Implement strict CORS policies allowing only trusted origins. Configure appropriate headers including Access-Control-Allow-Origin, Access-Control-Allow-Methods, and Access-Control-Allow-Headers. Implement preflight request handling. Ensure credentials mode is properly configured. Test with requests from allowed and disallowed origins, and verify preflight handling.",
-          "status": "pending"
+          "details": "1. Create custom error handlers that sanitize sensitive data\n2. Implement request/response middleware to filter credentials\n3. Configure logging frameworks to redact sensitive information\n4. Add data loss prevention checks in CI/CD pipeline\n5. Create automated tests to verify no credentials are leaked\n6. Review and update error messages across the application\n7. Document best practices for error handling",
+          "status": "done"
         }
       ]
     },

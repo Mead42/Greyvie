@@ -50,5 +50,22 @@ This document tracks tasks and features that are planned for future implementati
               sync_job_completed_total.labels(status=status).inc()
               sync_job_duration_seconds.labels(job_type=job_type).observe(duration)
       ```
+- [ ] Integrate validation, normalization, and pipeline modules into FastAPI endpoints
+    - [ ] Update endpoint handlers to use DataTransformationPipeline for incoming data
+    - [ ] Return validation/normalization errors in API responses
+    - [ ] Add tests for endpoint integration
+- [ ] Refactor existing ingestion logic to use the new pipeline
+    - [ ] Replace legacy validation/normalization code with pipeline usage
+    - [ ] Ensure all ingestion paths use the pipeline (single and batch)
+    - [ ] Update or add tests for refactored ingestion logic
+- [ ] Add advanced error recovery and/or parallel batch processing
+    - [ ] Implement 'default' error recovery strategy (use default values for missing/invalid fields)
+    - [ ] Add support for parallel batch processing for large datasets
+    - [ ] Benchmark and optimize batch performance
+    - [ ] Add tests for new error recovery and parallelism features
+- [ ] Generate OpenAPI docs and onboarding material
+    - [ ] Ensure all endpoints are documented with OpenAPI/Swagger
+    - [ ] Add usage examples for new pipeline in onboarding docs
+    - [ ] Link data_validation_pipeline.md in main README or onboarding guide
 
 <!-- Add new TODOs below --> 
