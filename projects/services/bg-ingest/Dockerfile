@@ -6,19 +6,17 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    POETRY_VERSION=1.7.1 \
-    POETRY_NO_INTERACTION=1 \
-    POETRY_VIRTUALENVS_CREATE=0
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install Poetry
-RUN pip install "poetry==$POETRY_VERSION"
+# Install build dependencies (if any are needed for wheels, e.g., gcc, build-essential, etc.)
+# RUN apt-get update && apt-get install -y build-essential && rm -rf /var/lib/apt/lists/*
 
 # Copy project configuration
 COPY pyproject.toml ./
+COPY . .
 
-# Install dependencies
-RUN poetry install --no-dev --no-root
+# Install dependencies using pip and PEP 621 (setuptools)
+RUN pip install --upgrade pip && pip install . --no-cache-dir
 
 # Create a slim production image
 FROM python:3.11-slim

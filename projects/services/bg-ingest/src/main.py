@@ -14,12 +14,13 @@ import base64
 import jwt
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse as StarletteJSONResponse
+import uuid
 
 from src.utils.config import Settings, get_settings, setup_logging
 from src.data.dynamodb import get_dynamodb_client
 from src.api.middleware import RateLimiter, CacheControl
 from src.api.readings import router as readings_router
-from src.utils.logging_utils import redact_sensitive_data
+from src.utils.logging_utils import redact_sensitive_data, setup_json_logging
 
 settings = get_settings()
 # Ensure we have a valid log level for testing scenarios where settings might be mocked
@@ -30,10 +31,11 @@ try:
     # Handle case where settings.log_level is a MagicMock
     if not isinstance(log_level, (str, int)) or (isinstance(log_level, str) and not hasattr(logging, log_level.upper())):
         log_level = "INFO"
-    setup_logging(log_level, log_output, log_file_path)
+    # Use structured JSON logging
+    setup_json_logging(log_level, log_output, log_file_path)
 except (ValueError, TypeError, AttributeError):
     # Default to INFO if there's any error with the log level
-    setup_logging("INFO", "stdout", None)
+    setup_json_logging("INFO", "stdout", None)
 logger = logging.getLogger(__name__)
 
 security = HTTPBasic()
@@ -118,11 +120,16 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         self.public_paths = {"/health", "/metrics", "/metrics/", "/docs", "/openapi.json"}
 
     async def dispatch(self, request: Request, call_next):
+        logger = logging.getLogger(__name__)
         # Skip auth for public endpoints
         if request.url.path in self.public_paths:
             return await call_next(request)
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
+            logger.warning(
+                "401 Unauthorized: Missing or invalid authorization header",
+                extra={"path": str(request.url.path), "status_code": 401, "reason": "missing_or_invalid_auth_header"}
+            )
             return JSONResponse(status_code=401, content={"detail": "Missing or invalid authorization header"})
         token = auth_header.replace("Bearer ", "")
         try:
@@ -138,8 +145,16 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             request.state.user_id = payload["sub"]
             request.state.scopes = payload.get("scopes", [])
         except jwt.ExpiredSignatureError:
+            logger.warning(
+                "401 Unauthorized: Token has expired",
+                extra={"path": str(request.url.path), "status_code": 401, "reason": "token_expired"}
+            )
             return JSONResponse(status_code=401, content={"detail": "Token has expired"})
         except jwt.InvalidTokenError as e:
+            logger.warning(
+                f"401 Unauthorized: Invalid token: {str(e)}",
+                extra={"path": str(request.url.path), "status_code": 401, "reason": "invalid_token"}
+            )
             return JSONResponse(status_code=401, content={"detail": f"Invalid token: {str(e)}"})
         return await call_next(request)
 
@@ -172,6 +187,20 @@ class RedactSensitiveDataMiddleware(BaseHTTPMiddleware):
                     return StarletteJSONResponse(safe_data, status_code=response.status_code)
             except Exception:
                 pass  # Ignore if not JSON or error
+        return response
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware to track and propagate a unique request ID for each request.
+    Adds X-Request-ID to response headers and attaches to request.state.
+    """
+    async def dispatch(self, request, call_next):
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        request.state.request_id = request_id
+        # Optionally, add request_id to logger extra for this request
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
         return response
 
 
@@ -216,6 +245,9 @@ def create_app() -> FastAPI:
     
     # Add Redact Sensitive Data middleware
     app.add_middleware(RedactSensitiveDataMiddleware)
+    
+    # Add Request ID middleware
+    app.add_middleware(RequestIDMiddleware)
     
     # Add routers
     app.include_router(readings_router, prefix="/api/bg", tags=["glucose"])

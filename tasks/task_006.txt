@@ -1,6 +1,6 @@
 # Task ID: 6
 # Title: Implement Data Validation and Normalization
-# Status: pending
+# Status: in-progress
 # Dependencies: 3, 5
 # Priority: medium
 # Description: Create services for validating and normalizing blood glucose data from Dexcom API before storage.
