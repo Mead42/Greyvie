@@ -3,7 +3,16 @@ from unittest import mock
 from datetime import datetime, timedelta
 import sys
 
-# Patch KeyManager and sys modules
+NOW = datetime(2024, 6, 1, 12, 0, 0)
+
+@pytest.fixture
+def patch_utcnow(monkeypatch):
+    class FixedDatetime(datetime):
+        @classmethod
+        def utcnow(cls):
+            return NOW
+    monkeypatch.setattr("scripts.rotate_keys.datetime", FixedDatetime)
+
 @pytest.fixture
 def fake_km(monkeypatch):
     class FakeKM:
@@ -26,8 +35,8 @@ def run_script_with_km(monkeypatch, created_at, argv):
     monkeypatch.setattr(rotate_keys, "KeyManager", lambda: rotate_keys.KeyManager(created_at))
     return rotate_keys
 
-def test_rotate_if_old(monkeypatch, capsys):
-    old_date = (datetime.utcnow() - timedelta(days=91)).isoformat() + 'Z'
+def test_rotate_if_old(monkeypatch, patch_utcnow, capsys):
+    old_date = (NOW - timedelta(days=91)).isoformat() + 'Z'
     class KM:
         def list_keys(self):
             return {"v1": {"created_at": old_date}}
@@ -35,14 +44,14 @@ def test_rotate_if_old(monkeypatch, capsys):
             return ("dummy", "v1")
         def rotate_key(self):
             return ("dummy2", "v2")
-    monkeypatch.setattr("src.utils.key_manager.KeyManager", lambda: KM())
     import scripts.rotate_keys as rk
+    monkeypatch.setattr(rk, "KeyManager", lambda: KM())
     rk.main()
     out = capsys.readouterr().out
     assert "Rotating" in out and "new key version" in out
 
-def test_warning_if_near_expiry(monkeypatch, capsys):
-    warn_date = (datetime.utcnow() - timedelta(days=85)).isoformat() + 'Z'
+def test_warning_if_near_expiry(monkeypatch, patch_utcnow, capsys):
+    warn_date = (NOW - timedelta(days=85)).isoformat() + 'Z'
     class KM:
         def list_keys(self):
             return {"v1": {"created_at": warn_date}}
@@ -50,14 +59,14 @@ def test_warning_if_near_expiry(monkeypatch, capsys):
             return ("dummy", "v1")
         def rotate_key(self):
             raise AssertionError("Should not rotate")
-    monkeypatch.setattr("src.utils.key_manager.KeyManager", lambda: KM())
     import scripts.rotate_keys as rk
+    monkeypatch.setattr(rk, "KeyManager", lambda: KM())
     rk.main()
     out = capsys.readouterr().out
     assert "WARNING" in out
 
-def test_ok_if_fresh(monkeypatch, capsys):
-    fresh_date = (datetime.utcnow() - timedelta(days=10)).isoformat() + 'Z'
+def test_ok_if_fresh(monkeypatch, patch_utcnow, capsys):
+    fresh_date = (NOW - timedelta(days=10)).isoformat() + 'Z'
     class KM:
         def list_keys(self):
             return {"v1": {"created_at": fresh_date}}
@@ -65,8 +74,8 @@ def test_ok_if_fresh(monkeypatch, capsys):
             return ("dummy", "v1")
         def rotate_key(self):
             raise AssertionError("Should not rotate")
-    monkeypatch.setattr("src.utils.key_manager.KeyManager", lambda: KM())
     import scripts.rotate_keys as rk
+    monkeypatch.setattr(rk, "KeyManager", lambda: KM())
     rk.main()
     out = capsys.readouterr().out
     assert "safe age window" in out 
